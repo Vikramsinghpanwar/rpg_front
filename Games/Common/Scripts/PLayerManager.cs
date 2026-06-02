@@ -1,0 +1,100 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+
+
+public class PLayerManager : MonoBehaviour
+{
+    public PeopleBet p1, p2, p3, p4, p5, p6;
+    public Image p1Img, p2Img, p3Img, p4Img, p5Img, p6Img;
+    public TextMeshProUGUI p1Name, p2Name, p3Name, p4Name, p5Name, p6Name;
+    public int[] playerSeq = new int[] { 0, 0, 0, 0 };
+
+    // Start is called before the first frame update
+    public void PlayerDeclaration()
+    {
+        List<int> excludedValues = new List<int>();
+
+        for(int j = 0; j<6; j++)
+        {
+            int k = Random.Range(0, LoadOnlinePlayers.onlinePlayerSpritesList.Count );
+            do
+            {
+                k = Random.Range(0, LoadOnlinePlayers.onlinePlayerSpritesList.Count);
+            }
+            while (excludedValues.Contains(k));
+            excludedValues.Add(k);
+            switch (j)
+            {
+                case 0:
+                    p6Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[k];
+                    p6Name.text = LoadOnlinePlayers.onlinePlayerSpritesList[k].name;
+              
+                    break;
+                case 1:
+                    p1Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[k];
+                    p1Name.text = LoadOnlinePlayers.onlinePlayerSpritesList[k].name;
+
+                    break;
+                case 2:
+                    p2Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[k];
+                    p2Name.text = LoadOnlinePlayers.onlinePlayerSpritesList[k].name;
+
+                    break;
+                case 3:
+                    p3Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[k];
+                    p3Name.text = LoadOnlinePlayers.onlinePlayerSpritesList[k].name;
+
+                    break;
+                case 4:
+                    p4Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[k];
+                    p4Name.text = LoadOnlinePlayers.onlinePlayerSpritesList[k].name;
+
+                    break;
+                case 5:
+                    p5Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[k];
+                    p5Name.text = LoadOnlinePlayers.onlinePlayerSpritesList[k].name;
+
+                    break;
+                
+            }
+            p1.WalletUpdate();
+            p2.WalletUpdate();
+            p3.WalletUpdate();
+            p4.WalletUpdate();
+            p5.WalletUpdate();
+            p6.WalletUpdate();
+
+
+        }
+    }
+
+
+    public void PlayerImg(int val)
+    {
+        switch (val)
+        {
+            case 2:
+                p2Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[playerSeq[0]];
+                p2Name.name = LoadOnlinePlayers.onlinePlayerSpritesList[playerSeq[0]].name;
+                break;
+            case 3:
+                p3Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[playerSeq[1]];
+                p3Name.name = LoadOnlinePlayers.onlinePlayerSpritesList[playerSeq[1]].name;
+                break;
+            case 4:
+                p4Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[playerSeq[2]];
+                p4Name.name = LoadOnlinePlayers.onlinePlayerSpritesList[playerSeq[2]].name;
+                break;
+            case 5:
+                p5Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[playerSeq[3]];
+                p5Name.name = LoadOnlinePlayers.onlinePlayerSpritesList[playerSeq[3]].name;
+                break;
+        }
+    }
+
+
+
+}
