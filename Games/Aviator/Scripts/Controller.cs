@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using Core.Bootstrap;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -183,8 +184,8 @@ public class Controller : MonoBehaviour
 
     void Start()
     {
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
+
         socketManagerRef = FindObjectOfType<SocketManagerAviator>();
         connectingPanel.SetActive(true);
         historyCreatorRef = FindObjectOfType<GameHistoryAviator>();
@@ -192,7 +193,6 @@ public class Controller : MonoBehaviour
         MyBetsObject.SetActive(false);
         populatePlayers = FindAnyObjectByType<PopulatePlayer>();
         BGM.Play();
-        apisRef.FetchWallet();
     }
     private void UpdateWallet(float wAmount)
     {
@@ -479,7 +479,7 @@ public class Controller : MonoBehaviour
     {
         SocketManagerAviator sm = FindObjectOfType<SocketManagerAviator>();
         sm.Disconnect();
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
 
     }
 

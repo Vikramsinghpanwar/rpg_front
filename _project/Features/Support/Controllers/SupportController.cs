@@ -5,6 +5,7 @@ using Features.Support.Models;
 using Core.API;
 using Core.API.Endpoints;
 using Core.Managers;
+using System.Linq;
 
 namespace Features.Support.Controllers
 {
@@ -59,7 +60,7 @@ namespace Features.Support.Controllers
         }
 
         public async Task<CreatedTicketResponse> CreateTicket(string subject, string body, string category,
-            string priority, string[] attachmentUrls = null, string dedupKey = null)
+            string priority, string[] attachmentMediaIds = null, string dedupKey = null)
         {
             LoadingManager.Instance?.Show("Creating ticket...");
             try
@@ -70,7 +71,7 @@ namespace Features.Support.Controllers
                     description = body,
                     category = category,
                     priority = priority ?? TicketPriority.MEDIUM,
-                    attachments = attachmentUrls ?? Array.Empty<string>(),
+                    attachmentMediaIds = attachmentMediaIds ?? Array.Empty<string>(),
                     dedupKey = dedupKey ?? Guid.NewGuid().ToString()
                 };
 
@@ -96,10 +97,7 @@ namespace Features.Support.Controllers
             }
         }
 
-        // Caller MUST pass the version from the most recently loaded TicketDetailResponse.
-        // On VersionConflict the UI is expected to refetch the detail and prompt retry; we don't
-        // auto-retry because the user's reply may now be redundant with new agent activity.
-        public async Task<ReplyResult> ReplyToTicket(string ticketId, string message, string[] attachmentUrls, int version)
+        public async Task<ReplyResult> ReplyToTicket(string ticketId, string message, int version)
         {
             LoadingManager.Instance?.Show("Sending reply...");
             try
@@ -107,7 +105,6 @@ namespace Features.Support.Controllers
                 var request = new ReplyRequest
                 {
                     body = message,
-                    attachments = attachmentUrls ?? Array.Empty<string>(),
                 };
                 await ApiClient.Instance.Post<object>(SupportRoutes.Replies(ticketId), request);
                 PopupManager.Instance?.ShowSuccess("Reply sent!");

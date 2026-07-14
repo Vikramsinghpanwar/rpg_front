@@ -2,8 +2,9 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
-public class ModelOpen : MonoBehaviour{
-  
+public class ModelOpen : MonoBehaviour
+{
+
     public void OpenModel(Image image)
     {
         if (image != null)
@@ -22,9 +23,9 @@ public class ModelOpen : MonoBehaviour{
 
     public void Lobby()
     {
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 
-   
+
 
 }

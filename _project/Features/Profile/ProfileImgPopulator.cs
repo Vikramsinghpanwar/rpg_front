@@ -26,9 +26,9 @@ public class ProfileImgPopulator : MonoBehaviour
 
     public void Populate()
     {
-        
+
         Object[] loadedSprites = Resources.LoadAll("Avatar", typeof(Sprite));
-        int i =0;
+        int i = 0;
         Profiles = new Sprite[loadedSprites.Length];
         foreach (Object obj in loadedSprites)
         {
@@ -46,12 +46,12 @@ public class ProfileImgPopulator : MonoBehaviour
     {
         selectedIndex = val;
         PlayerPrefs.DeleteKey("myProfile");
-        UserData.Instance.ProfileImage(Profiles[val]);
+        // UserData.Instance.ProfileImage(Profiles[val]);
     }
 
     public void UpdateProfile(int index)
     {
         Debug.Log("Updating image at index: " + index);
-        UserData.Instance.ProfileImage(Profiles[index]);
+        // UserData.Instance.ProfileImage(Profiles[index]);
     }
 }

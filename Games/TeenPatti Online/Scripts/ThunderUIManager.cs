@@ -33,11 +33,7 @@ public class ThunderUIManager : MonoBehaviour
     }
 
     public void PlayThunder(PlayerManager from, PlayerManager to)
-    {
-        Debug.Log("from player : " + from.myId + from.ToString());
-        Debug.Log("to player : " + to.myId + to.ToString());
-        Debug.Log("playing thunder for " + from.myIndex + "" + to.myIndex);
-        
+    {        
         int seat1 = from.myIndex;
         int seat2 = to.myIndex;
 

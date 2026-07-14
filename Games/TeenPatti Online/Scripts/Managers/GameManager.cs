@@ -8,11 +8,11 @@ using Teenpatti;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Teenpatti;
 using UnityEngine.Networking;
 using Core.Config;
 using Core.Bootstrap;
 using Features.Lobby.Integration;
+using Core.Utils;
 
 namespace Teenpatti
 {
@@ -50,6 +50,7 @@ namespace Teenpatti
         public GameObject gameEndPanel;
         public TextMeshProUGUI winnerText;
         public GameObject sideShowRequestPanel;
+        public GameObject reconnectOverlay;
         public TextMeshProUGUI sideShowRequestText;
         public AudioSource cardDistributionAudio;
 
@@ -120,70 +121,111 @@ namespace Teenpatti
 
         void OnApplicationFocus(bool hasFocus)
         {
+            string ts = DateTime.Now.ToString("HH:mm:ss.fff");
             if (hasFocus)
             {
-                Debug.Log("App has come to foreground - refreshing game state");
+                Debug.Log($"[{ts}] [Lifecycle] OnApplicationFocus(true)");
                 if (isRecharging && !string.IsNullOrEmpty(rechargingPlayerId) && rechargingPlayerId == BootstrapLobbyAdapter.GetUserId())
                 {
                     //FetchWallet();
 
                 }
             }
-        }
-
-
-        void CheckIfRechargeSuccessful()
-        {
-            float wallet = GameLiveData.instance.isPrivateTable ? (BootstrapService.Instance.Wallet.deposit_balance / 100f + BootstrapService.Instance.Wallet.win_balance / 100f) : BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f;
-            if (wallet >= GameLiveData.instance.lastBetAmount + playersList[0].amountInvested)
+            else
             {
-                isRecharging = false;
-                rechargingPlayerId = "";
-                playerRechargingPanel.SetActive(false);
-                Logger.Instance.Log("Recharge successful, resuming game");
-                ActionButtons.instance.addRechargePanel.SetActive(false);
-                InGameRecharge.instance.ClosePanel();
-                if (WebSocketServerRequest.Instance != null)
-                {
-                    int chips = GameLiveData.instance.isPrivateTable
-                        ? Mathf.FloorToInt((float)(BootstrapService.Instance.Wallet.deposit_balance / 100f + BootstrapService.Instance.Wallet.win_balance / 100f))
-                        : Mathf.FloorToInt((float)(BootstrapService.Instance.Wallet.deposit_balance / 100f + BootstrapService.Instance.Wallet.win_balance / 100f + BootstrapLobbyAdapter.GetBonusBalance() / 100f));
-
-                    WebSocketServerRequest.Instance.SendAction("recharge_complete", chips);
-                }
+                Debug.Log($"[{ts}] [Lifecycle] OnApplicationFocus(false)");
             }
         }
 
+
+        void Start()
+        {
+            tableID_TMP.text = GameLiveData.instance.tableId;
+            if (GameMode.mode == GameMode.Modes.privateGame)
+            {
+                userWalletTxt.text = MoneyFormatter.FormatPaisa((long)(BootstrapService.Instance.Wallet.available_balance - BootstrapService.Instance.Wallet.bonus_balance));
+                PrivateTableTMP.gameObject.SetActive(true);
+                PrivateTableTMP.text = "Private Code : " + GameLiveData.instance.privateTableCode;
+                // PrivateTableTMP.text = "Private Code : " + TeenpattiGameDataLobby.teenpattiTableID_for_JOIN;
+                // if (TeenpattiGameDataLobby.createTable)
+                //     {
+                //         StartTableBtn.SetActive(true);
+                //     }
+            }
+            else
+            {
+                userWalletTxt.text = MoneyFormatter.FormatPaisa((long)BootstrapService.Instance.Wallet.available_balance);
+                PrivateTableTMP.gameObject.SetActive(false);
+            }
+            cardsDeal = FindObjectOfType<CardsDeal>();
+
+
+            if (GameLiveData.instance.tableState == "waiting")
+            {
+                waitingPanel.SetActive(true);
+            }
+
+            if (GameLiveData.instance.rejoin && GameLiveData.instance.tableState != "waiting")
+            {
+                SyncGameState();
+            }
+            else if (GameLiveData.instance.isSpectator)
+            {
+                spectatorPanel.SetActive(true);
+                SyncGameState();
+            }
+            else
+            {
+                // simple join data
+                if (GameLiveData.instance.playerDetailsArray != null && GameLiveData.instance.playerDetailsArray.Length > 0)
+                    PopulatePlayersOnJoin(GameLiveData.instance.playerDetailsArray);
+            }
+
+            if (GameLiveData.instance.rechargingPlayer != null && GameLiveData.instance.rechargingPlayer != "" && GameLiveData.instance.rechargeTimeRemaining > 0 && !playerRechargingPanel.activeInHierarchy)
+            {
+                Debug.Log($"Player {GameLiveData.instance.rechargingPlayer} is recharging with {GameLiveData.instance.rechargeTimeRemaining} seconds left");
+                string rechargingPlayerName = playersList.Find(p => p.myId == GameLiveData.instance.rechargingPlayer)?.nameTxt.text ?? GameLiveData.instance.rechargingPlayer;
+                Recharging(GameLiveData.instance.rechargingPlayer, rechargingPlayerName, GameLiveData.instance.rechargeTimeRemaining);
+            }
+
+            // subscribe to lobby event from GameMenuController
+            GameMenuController.Instance.OnBackToLobbyRequested += OnLobbyBtnClicked;
+            GameMenuController.Instance.customLobbyButtonBehavior = true;
+
+        }
 
         public void OnLobbyBtnClicked()
         {
             if (GameLiveData.instance.isSpectator)
             {
-                if (ConnectionManager.Instance != null)
+                MainThreadDispatcher.Enqueue(async () =>
                 {
-                    ConnectionManager.Instance.LeaveTable();
-                }
-                SceneManager.LoadScene(1);
+                    if (ConnectionManager.Instance != null)
+                    {
+                        await Task.Yield();
+                        ConnectionManager.Instance.LeaveTable();
+                    }
+                });
                 return;
             }
             else
             {
                 sureToExitPanel.SetActive(true);
             }
-
         }
 
         public void ConfirmExitToLobby()
         {
             Loader.Instance.ShowLoading();
-            _ = WebSocketServerRequest.Instance.LeaveTable();
-            Invoke("Lobbby", 2f);
-            // WebSocketServerRequest.Instance.SendAction("leave_table");
+            if (ConnectionManager.Instance != null)
+            {
+                ConnectionManager.Instance.LeaveTable();
+            }
         }
 
         void Lobbby()
         {
-            SceneManager.LoadScene(1);
+            SceneManager.LoadScene("Lobby");
         }
 
         public void OnLobby()
@@ -261,61 +303,12 @@ namespace Teenpatti
 
         public void InviteFriend()
         {
-            string message = $"your friend {UserDetail.UserName} has invited you to join a private table on The Crown Empire. Click to join. {Const.landingPageURL + "?game=teenpatti&roomId=" + GameLiveData.instance.privateTableCode} \n\n or start game and go to private table and enter code '{GameLiveData.instance.privateTableCode}'. Have Fun!";
+            string message = $"your friend {UserDetail.UserName} has invited you to join a private table on The Black Pearl. Click to join. {Const.landingPageURL + "?game=teenpatti&roomId=" + GameLiveData.instance.privateTableCode} \n\n or start game and go to private table and enter code '{GameLiveData.instance.privateTableCode}'. Have Fun!";
             ShareManager.instance.ShareText(message);
             Debug.Log("Invite message: " + message);
         }
 
 
-        void Start()
-        {
-            //LoadAllAvatars();       
-            tableID_TMP.text = GameLiveData.instance.tableId;
-            if (GameMode.mode == GameMode.Modes.privateGame)
-            {
-                userWalletTxt.text = (BootstrapService.Instance.Wallet.deposit_balance / 100f + BootstrapService.Instance.Wallet.win_balance / 100f).ToString("F2");
-                PrivateTableTMP.gameObject.SetActive(true);
-                PrivateTableTMP.text = "Private Code : " + GameLiveData.instance.privateTableCode;
-                // PrivateTableTMP.text = "Private Code : " + TeenpattiGameDataLobby.teenpattiTableID_for_JOIN;
-                // if (TeenpattiGameDataLobby.createTable)
-                //     {
-                //         StartTableBtn.SetActive(true);
-                //     }
-            }
-            else
-            {
-                userWalletTxt.text = (BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f).ToString("F2");
-                PrivateTableTMP.gameObject.SetActive(false);
-            }
-            cardsDeal = FindObjectOfType<CardsDeal>();
-
-
-            if (GameLiveData.instance.tableState == "waiting")
-            {
-                waitingPanel.SetActive(true);
-            }
-
-            if (GameLiveData.instance.rejoin && GameLiveData.instance.tableState != "waiting")
-            {
-                SyncGameState();
-            }
-            else if (GameLiveData.instance.isSpectator)
-            {
-                spectatorPanel.SetActive(true);
-                SyncGameState();
-            }
-            else
-            {
-                // simple join data
-                PopulatePlayersOnJoin(GameLiveData.instance.playerDetailsArray);
-            }
-
-            if (GameLiveData.instance.rechargingPlayer != null && GameLiveData.instance.rechargingPlayer != "" && GameLiveData.instance.rechargeTimeRemaining > 0 && !playerRechargingPanel.activeInHierarchy)
-            {
-                Debug.Log($"Player {GameLiveData.instance.rechargingPlayer} is recharging with {GameLiveData.instance.rechargeTimeRemaining} seconds left");
-                Recharging(GameLiveData.instance.rechargingPlayer, GameLiveData.instance.rechargeTimeRemaining);
-            }
-        }
 
         public void ResetTableForNextRound()
         {
@@ -349,18 +342,25 @@ namespace Teenpatti
 
         public void Recharged()
         {
+            Logger.Instance.Log("Recharge successful, resuming game");
             isRecharging = false;
             rechargingPlayerId = "";
             playerRechargingPanel.SetActive(false);
-            Logger.Instance.Log("Recharge successful, resuming game");
             ActionButtons.instance.addRechargePanel.SetActive(false);
         }
-        public void Recharging(string UserId, float timeout)
+        public void Recharging(string UserId, string username, float timeout)
         {
             Debug.Log($"Player {UserId} is recharging with timeout {timeout}");
             playerRechargingPanel.SetActive(true);
-            string playerName = playersList.Find(p => p.myId == UserId)?.nameTxt.text ?? UserId;
-            playerRechargingPanelText.text = $"Waiting for {playerName} to recharge...";
+            if (!string.IsNullOrEmpty(username))
+            {
+                playerRechargingPanelText.text = $"Waiting for {username} to recharge...";
+            }
+            else
+            {
+                string playerName = playersList.Find(p => p.myId == UserId)?.nameTxt.text ?? UserId;
+                playerRechargingPanelText.text = $"Waiting for {playerName} to recharge...";
+            }
             foreach (PlayerManager player in playersList)
             {
                 if (player.myId == UserId)
@@ -455,7 +455,8 @@ namespace Teenpatti
             }
             else
             {
-                SyncPlayers(playerDetails);
+                if (playerDetails != null)
+                    SyncPlayers(playerDetails);
             }
 
             lastBetAmount = GameLiveData.instance.lastBetAmount;
@@ -495,7 +496,6 @@ namespace Teenpatti
                     if (player.myId == requesterID)
                     {
                         player.HandleShow(amount);
-
                     }
                 }
 
@@ -513,7 +513,7 @@ namespace Teenpatti
 
             foreach (var data in playerArray)
             {
-                if (data != null && data.userId == localUserId)
+                if (data != null && data.publicId == localUserId)
                 {
                     localSeat = data.position;
                     break;
@@ -547,21 +547,22 @@ namespace Teenpatti
                 player.SetVacant(false);
                 player.CardObj.SetActive(true);
                 player.status = "active";
-                player.myId = data.userId;
+                player.myId = data.publicId;
                 player.amountInvested = data.betAmount;
                 player.myAmountTxt.text = data.betAmount.ToString("F2");
                 player.PopulateWithPlayer(
-                    data.profileImageIndex,
-                    data.username
+                    0,
+                    data.username,
+                    data.profileImageUrl
                 );
 
                 player.Connected(data.username, data.chips);
 
-                if (data.userId == localUserId)
+                if (data.publicId == localUserId)
                 {
                     player.isLocalPlayer = true;
                     localPlayer = player;
-
+                    BootstrapService.Instance.Wallet.available_balance = GameMode.mode == GameMode.Modes.privateGame ? (long)data.chips * 100 + BootstrapService.Instance.Wallet.bonus_balance : (long)data.chips * 100;
                     if (data.cards != null && data.cards.Length > 0)
                     {
                         Debug.Log("" + data.cards.Length);
@@ -620,7 +621,7 @@ namespace Teenpatti
                 {
                     if (ActionButtons.instance != null)
                     {
-                        float wallet = GameLiveData.instance.isPrivateTable ? (BootstrapService.Instance.Wallet.deposit_balance / 100f + BootstrapService.Instance.Wallet.win_balance / 100f) : BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f;
+                        float wallet = GameLiveData.instance.isPrivateTable ? (BootstrapService.Instance.Wallet.available_balance - BootstrapService.Instance.Wallet.bonus_balance) / 100f : BootstrapService.Instance.Wallet.available_balance / 100f;
                         if (wallet < GameLiveData.instance.lastBetAmount)
                         {
                             ActionButtons.instance.InsufficientFunds();
@@ -643,7 +644,7 @@ namespace Teenpatti
 
             foreach (var data in playerArray)
             {
-                if (data != null && data.userId == localUserId)
+                if (data != null && data.publicId == localUserId)
                 {
                     localSeat = data.position;
                     break;
@@ -663,26 +664,27 @@ namespace Teenpatti
             // Map players
             foreach (var data in playerArray)
             {
-                if (data == null || data.userId == "")
+                if (data == null || data.publicId == "")
                     continue;
 
-                Debug.Log("pLAYER : " + data.userId);
+                Debug.Log("pLAYER : " + data.publicId);
                 Debug.Log("pLAYER : " + data.username);
                 int uiIndex = (data.position - localSeat + totalSeats) % totalSeats;
                 PlayerManager player = playersList[uiIndex];
 
                 player.SetVacant(false);
                 player.status = "active";
-                player.myId = data.userId;
+                player.myId = data.publicId;
 
                 player.PopulateWithPlayer(
-                    data.profileImageIndex,
-                    data.username
+                    0,
+                    data.username,
+                    data.profileImageUrl
                 );
 
                 player.Connected(data.username, data.chips);
 
-                if (data.userId == localUserId)
+                if (data.publicId == localUserId)
                 {
                     player.isLocalPlayer = true;
                     localPlayer = player;
@@ -729,12 +731,18 @@ namespace Teenpatti
                 player.SetVacant(false);
                 player.status = "active";
                 player.CardObj.SetActive(true);
+                player.myId = data.id;
 
                 player.Connected(data.username, data.chips);
-                player.profileImg.sprite = GetAvatarByIndex(data.profileImageIndex);
-                player.myId = data.id;
+
                 player.amountInvested = data.betAmount;
                 player.myAmountTxt.text = data.betAmount.ToString("F2");
+
+                player.PopulateWithPlayer(
+                    0,
+                    data.username,
+                    data.profileImageUrl
+                );
 
                 if (data.position == GameLiveData.instance.dealerPosition)
                 {
@@ -759,19 +767,18 @@ namespace Teenpatti
             cardDistributionAudio.Play();
             if (cardsDeal == null)
             {
-                Debug.Log("radhey");
+                Debug.Log("cardsDeal is null, finding it in scene");
             }
             StartCoroutine(cardsDeal.DealCards());
             var playerDetailArray = GameLiveData.instance.playerDetailsArray;
             for (int i = 0; i < playerDetailArray.Length; i++)
             {
-                Debug.Log("i: " + i);
                 if (playerDetailArray[i] == null) continue;
                 if (playerDetailArray[i].cards != null && playerDetailArray[i].cards.Length > 0)
                 {
                     playersList[0].cardsSpriteList = new Sprite[3];
 
-                    Debug.Log("cards length: " + playersList[0].cardsSpriteList.Length);
+                    // Debug.Log("cards length: " + playersList[0].cardsSpriteList.Length);
 
                     playersList[0].myCardsType = GameLiveData.instance.playerDetailsArray[i].cardsType;
                     for (int j = 0; j < playerDetailArray[i].cards.Length; j++)
@@ -803,7 +810,7 @@ namespace Teenpatti
             int pivotIndex = 0;
             for (int i = 0; i < playerDetailArray.Length; i++)
             {
-                if (playerDetailArray[i] == null || !playerDetailArray[i].isActive || playerDetailArray[i].userId == "")
+                if (playerDetailArray[i] == null || !playerDetailArray[i].isActive || playerDetailArray[i].publicId == "")
                 {
                     // Reset player details
                     if (playersList[i] != null)
@@ -815,7 +822,7 @@ namespace Teenpatti
                     }
                     continue;
                 }
-                if (playerDetailArray[i].userId == localPlayerID)
+                if (playerDetailArray[i].publicId == localPlayerID)
                 {
                     pivotIndex = i;
                     break;
@@ -837,7 +844,7 @@ namespace Teenpatti
             for (int i = 0; i < playerDetailArray.Length; i++)
             {
                 PlayerManager player = playersList[i];
-                if (playerDetailArray[i] == null || !playerDetailArray[i].isActive || playerDetailArray[i].userId == "")
+                if (playerDetailArray[i] == null || !playerDetailArray[i].isActive || playerDetailArray[i].publicId == "")
                 {
                     continue;
                 }
@@ -848,14 +855,19 @@ namespace Teenpatti
                 {
                     player.MarkAsDealer();
                 }
-                player.profileImg.sprite = GetAvatarByIndex(playerDetailArray[i].profileImageIndex);
+
+                playersList[i].Connected(playerDetailArray[i].username, playerDetailArray[i].amount);
+                playersList[i].myId = playerDetailArray[i].id;
+                player.PopulateWithPlayer(
+                    0,
+                    playerDetailArray[i].username,
+                    playerDetailArray[i].profileImageUrl
+                );
                 player.CardObj.SetActive(false);
                 player.status = "active";
                 player.SetVacant(false);
-                playersList[i].Connected(playerDetailArray[i].username, playerDetailArray[i].amount);
-                playersList[i].myId = playerDetailArray[i].id;
 
-                if (playerDetailArray[i].userId == localPlayerID)
+                if (playerDetailArray[i].publicId == localPlayerID)
                 {
                     player.isLocalPlayer = true;
                     localPlayer = player;
@@ -877,7 +889,7 @@ namespace Teenpatti
             int pivotIndex = 0;
             for (int i = 0; i < playerDetailArray.Length; i++)
             {
-                if (playerDetailArray[i].userId == playerId)
+                if (playerDetailArray[i].publicId == playerId)
                 {
                     pivotIndex = i;
                     break;
@@ -905,11 +917,15 @@ namespace Teenpatti
                 {
                     player.MarkAsDealer();
                 }
-                player.profileImg.sprite = GetAvatarByIndex(playerDetailArray[i].profileImageIndex);
+                player.PopulateWithPlayer(
+                    0,
+                    playerDetailArray[i].username,
+                    playerDetailArray[i].profileImageUrl
+                );
                 player.CardObj.SetActive(false);
                 player.status = "active";
                 player.SetVacant(false);
-                if (playerDetailArray[i].userId == playerId)
+                if (playerDetailArray[i].publicId == playerId)
                 {
                     playersList[0].myId = playerDetailArray[i].id;
                     playersList[0].Connected(playerDetailArray[i].username, 0);
@@ -985,12 +1001,14 @@ namespace Teenpatti
 
         public void UpdateWalletTxt()
         {
+            Debug.Log("Updating wallet textttttttttttttttttt: " + BootstrapService.Instance.Wallet.available_balance);
             if (GameMode.mode == GameMode.Modes.privateGame)
             {
-                userWalletTxt.text = (BootstrapService.Instance.Wallet.win_balance / 100f + BootstrapService.Instance.Wallet.deposit_balance / 100f).ToString("F2");
+                Debug.Log("Updating wallet text for private game: " + (BootstrapService.Instance.Wallet.available_balance - BootstrapService.Instance.Wallet.bonus_balance));
+                userWalletTxt.text = MoneyFormatter.FormatPaisa((long)(BootstrapService.Instance.Wallet.available_balance - BootstrapService.Instance.Wallet.bonus_balance));
                 return;
             }
-            userWalletTxt.text = (BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f).ToString("F2");
+            userWalletTxt.text = MoneyFormatter.FormatPaisa((long)BootstrapService.Instance.Wallet.available_balance);
         }
 
         public void ShowPackedPlayers(PackedPlayerData[] packedPlayers)
@@ -1000,7 +1018,7 @@ namespace Teenpatti
 
             foreach (var packed in packedPlayers)
             {
-                PlayerManager player = GetPlayerByID(packed.userID);
+                PlayerManager player = GetPlayerByID(packed.publicId);
 
                 if (player == null)
                     continue;
@@ -1023,14 +1041,12 @@ namespace Teenpatti
                 // // Play lose animation (if not winner)
                 // player.Lose();
 
-                Debug.Log($"Packed Player Revealed: {packed.userID} - {packed.handType}");
+                Debug.Log($"Packed Player Revealed: {packed.publicId} - {packed.handType}");
             }
         }
 
         public void ShowWinner(string winnerId, string[] cards)
         {
-            Debug.Log("cards: " + cards[0]);
-            Debug.Log("Showing winner: " + winnerId);
             // Stop all timers
             if (timerCoroutine != null)
             {
@@ -1109,10 +1125,10 @@ namespace Teenpatti
                 {
                     if (ActionButtons.instance != null)
                     {
-                        float wallet = GameLiveData.instance.isPrivateTable ? (BootstrapService.Instance.Wallet.deposit_balance / 100f + BootstrapService.Instance.Wallet.win_balance / 100f) : BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f;
+                        float wallet = GameMode.mode == GameMode.Modes.privateGame ? (BootstrapService.Instance.Wallet.available_balance - BootstrapService.Instance.Wallet.bonus_balance) / 100f : BootstrapService.Instance.Wallet.available_balance / 100f;
+                        Debug.Log("Wallet: " + wallet + ", Last Bet Amount: " + GameLiveData.instance.lastBetAmount);
                         if (wallet < GameLiveData.instance.lastBetAmount)
                         {
-
                             ActionButtons.instance.InsufficientFunds();
                         }
                         ActionButtons.instance.ShowBtn.gameObject.SetActive(_canShow);
@@ -1147,7 +1163,7 @@ namespace Teenpatti
         {
             yield return new WaitForSeconds(delay);
             Destroy(GameLiveData.instance.gameObject);
-            SceneManager.LoadScene(1);
+            SceneManager.LoadScene("Lobby");
         }
 
         public void PlayAgain()
@@ -1156,10 +1172,22 @@ namespace Teenpatti
             SceneManager.LoadScene("Lobby");
         }
 
-        public void LeaveGame()
+        // public void LeaveGame()
+        // {
+        //     ConnectionManager.Instance.LeaveTable();
+        // }
+
+        public void ShowReconnectOverlay(bool show)
         {
-            ConnectionManager.Instance.LeaveTable();
-            SceneManager.LoadScene("Lobby");
+            Debug.Log($"ShowReconnectOverlay called with show={show}");
+            if (reconnectOverlay != null)
+            {
+                reconnectOverlay.SetActive(show);
+            }
+            else
+            {
+                Debug.LogWarning("Reconnect overlay GameObject is not assigned in the inspector.");
+            }
         }
     }
 }

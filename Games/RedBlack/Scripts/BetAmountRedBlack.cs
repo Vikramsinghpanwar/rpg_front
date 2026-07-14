@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using Core.Utils;
 
 public class BetAmount : MonoBehaviour
 {
@@ -17,7 +18,7 @@ public class BetAmount : MonoBehaviour
         minusImg.sprite = minusInActive;
         plusImg.sprite = plusActive;
         amount = 10;
-        amtText.text = amount.ToString();
+        amtText.text = MoneyFormatter.FormatPaisa(amount);
     }
     public void Increase()
     {
@@ -25,12 +26,12 @@ public class BetAmount : MonoBehaviour
         if(amount == 10)
         {
             amount = 100;
-            amtText.text = amount.ToString();
+            amtText.text = MoneyFormatter.FormatPaisa(amount);
         }
         else if(amount < 2000)
         {
             amount += 100;
-            amtText.text = amount.ToString();
+            amtText.text = MoneyFormatter.FormatPaisa(amount);
 
         }
         if(amount == 2000)
@@ -44,12 +45,12 @@ public class BetAmount : MonoBehaviour
         if(amount == 100)
         {
             amount = 10;
-            amtText.text = amount.ToString();
+            amtText.text = MoneyFormatter.FormatPaisa(amount);
         }
         if (amount > 100)
         {
             amount -= 100;
-            amtText.text = amount.ToString();
+            amtText.text = MoneyFormatter.FormatPaisa(amount);
 
         }
         if(amount <= 100)
@@ -61,7 +62,7 @@ public class BetAmount : MonoBehaviour
     public void Max()
     {
         amount = 2000;
-        amtText.text = amount.ToString();
+        amtText.text = MoneyFormatter.FormatPaisa(amount);
         plusImg.sprite = plusInActive;
 
     }

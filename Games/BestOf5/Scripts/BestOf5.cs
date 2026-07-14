@@ -9,6 +9,8 @@ using UnityEngine.SceneManagement;
 using System.Security.Cryptography;
 using System.Text;
 using Features.Lobby.Integration;
+using Core.Bootstrap;
+using Core.Utils;
 
 public class BestOf5 : MonoBehaviour
 {
@@ -217,10 +219,10 @@ public class BestOf5 : MonoBehaviour
             int n = (randomValue4 * 770);
 
 
-            otherPlayerBets_Txt_Array[0].text = "₹" + k;
-            otherPlayerBets_Txt_Array[1].text = "₹" + l;
-            otherPlayerBets_Txt_Array[2].text = "₹" + m;
-            otherPlayerBets_Txt_Array[3].text = "₹" + n;
+            otherPlayerBets_Txt_Array[0].text = MoneyFormatter.FormatPaisa(k);
+            otherPlayerBets_Txt_Array[1].text = MoneyFormatter.FormatPaisa(l);
+            otherPlayerBets_Txt_Array[2].text = MoneyFormatter.FormatPaisa(m);
+            otherPlayerBets_Txt_Array[3].text = MoneyFormatter.FormatPaisa(n);
 
 
             yield return new WaitForSeconds(updateInterval);
@@ -230,10 +232,10 @@ public class BestOf5 : MonoBehaviour
 
     void ResetBetAmount()
     {
-        otherPlayerBets_Txt_Array[0].text = "₹" + "0";
-        otherPlayerBets_Txt_Array[1].text = "₹" + "0";
-        otherPlayerBets_Txt_Array[2].text = "₹" + "0";
-        otherPlayerBets_Txt_Array[3].text = "₹" + "0";
+        otherPlayerBets_Txt_Array[0].text = MoneyFormatter.FormatPaisa(0);
+        otherPlayerBets_Txt_Array[1].text = MoneyFormatter.FormatPaisa(0);
+        otherPlayerBets_Txt_Array[2].text = MoneyFormatter.FormatPaisa(0);
+        otherPlayerBets_Txt_Array[3].text = MoneyFormatter.FormatPaisa(0);
     }
     public void ShowResult(int[] winner)
     {
@@ -265,7 +267,7 @@ public class BestOf5 : MonoBehaviour
     {
         Debug.Log("updatin wallet");
         walletAmount = wAmount;
-        walletText.text = "₹" + wAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)(wAmount * 100));
     }
 
     public void LoadDeck()
@@ -310,9 +312,8 @@ public class BestOf5 : MonoBehaviour
     private void Start()
     {
         LoadDeck();
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
-        apisRef.FetchWallet();
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
+
         player1_Amount_Display_Text.gameObject.SetActive(false);
         player2_Amount_Display_Text.gameObject.SetActive(false);
         player3_Amount_Display_Text.gameObject.SetActive(false);
@@ -346,7 +347,7 @@ public class BestOf5 : MonoBehaviour
     }
     public void Lobby()
     {
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
     public void ShowCard(Transform card, Sprite cardImg)
     {

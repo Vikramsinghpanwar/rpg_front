@@ -15,15 +15,14 @@ namespace Features.Recharge.UI
         [Header("UI References")]
         [SerializeField] private Transform historyContainer;
         [SerializeField] private GameObject historyItemPrefab;
-        [SerializeField] private Button refreshButton;
-        [SerializeField] private TMP_Text refreshCooldownText;
+        [SerializeField] private Button previousButton;
+        [SerializeField] private Button nextButton;
+        [SerializeField] private TMP_Text pageInfoText;
         [SerializeField] private GameObject emptyStateText;
 
-        [Header("Config")]
-        [SerializeField] private float refreshCooldownSeconds = 3f;
-
         readonly List<RechargeHistoryItem> items = new List<RechargeHistoryItem>();
-        float lastRefreshTime = -999f;
+        int currentPage = 1;
+        int totalPages = 1;
 
         void Awake()
         {
@@ -34,20 +33,29 @@ namespace Features.Recharge.UI
                 controller = go.AddComponent<RechargeController>();
             }
 
-            if (refreshButton != null) refreshButton.onClick.AddListener(OnRefreshClicked);
+            if (previousButton != null) previousButton.onClick.AddListener(OnPreviousClicked);
+            if (nextButton != null) nextButton.onClick.AddListener(OnNextClicked);
 
             controller.OnHistoryLoaded += OnHistoryLoaded;
+            controller.OnPaginationChanged += OnPaginationChanged;
+            controller.OnError += OnError;
         }
 
-        void OnEnable() => _ = LoadHistory(forceRefresh: false);
+        void OnEnable() => _ = LoadHistory(true);
 
         void OnDestroy()
         {
-            if (controller != null) controller.OnHistoryLoaded -= OnHistoryLoaded;
+            if (controller != null)
+            {
+                controller.OnHistoryLoaded -= OnHistoryLoaded;
+                controller.OnPaginationChanged -= OnPaginationChanged;
+                controller.OnError -= OnError;
+            }
         }
 
         async System.Threading.Tasks.Task LoadHistory(bool forceRefresh)
         {
+            if (controller == null) return;
             await controller.FetchHistory(forceRefresh);
             if (controller.HasNonTerminalRecharges())
             {
@@ -55,16 +63,23 @@ namespace Features.Recharge.UI
             }
         }
 
-        void OnRefreshClicked()
+        void OnPreviousClicked()
         {
-            if (Time.time - lastRefreshTime < refreshCooldownSeconds)
-            {
-                float remaining = refreshCooldownSeconds - (Time.time - lastRefreshTime);
-                PopupManager.Instance?.Show("Cooldown", $"Please wait {remaining:F0} seconds before refreshing again", "OK");
-                return;
-            }
-            lastRefreshTime = Time.time;
-            _ = LoadHistory(forceRefresh: true);
+            currentPage = controller.CurrentHistoryPage;
+            _ = controller.PreviousPage();
+        }
+
+        void OnNextClicked()
+        {
+            currentPage = controller.CurrentHistoryPage;
+            _ = controller.NextPage();
+        }
+
+        void OnPaginationChanged(int page, int total)
+        {
+            currentPage = page;
+            totalPages = total;
+            UpdatePaginationUI();
         }
 
         void OnHistoryLoaded(List<Models.RechargeRecord> history)
@@ -74,7 +89,11 @@ namespace Features.Recharge.UI
 
             bool hasItems = history != null && history.Count > 0;
             if (emptyStateText != null) emptyStateText.SetActive(!hasItems);
-            if (!hasItems || historyItemPrefab == null || historyContainer == null) return;
+            if (!hasItems || historyItemPrefab == null || historyContainer == null)
+            {
+                UpdatePaginationUI();
+                return;
+            }
 
             foreach (var record in history)
             {
@@ -86,25 +105,31 @@ namespace Features.Recharge.UI
                     items.Add(item);
                 }
             }
+
+            UpdatePaginationUI();
+        }
+
+        void UpdatePaginationUI()
+        {
+            bool canPrev = controller != null && controller.CurrentHistoryPage > 1;
+            bool canNext = controller != null && controller.HasMoreHistory;
+
+            if (previousButton != null) previousButton.interactable = canPrev;
+            if (nextButton != null) nextButton.interactable = canNext;
+
+            int page = controller != null ? controller.CurrentHistoryPage : currentPage;
+            int total = controller != null ? controller.TotalHistoryPages : totalPages;
+            if (pageInfoText != null)
+            {
+                pageInfoText.text = total > 1 ? $"Page {page} / {total}" : $"Page {page}";
+            }
+        }
+
+        void OnError(string code, string message)
+        {
+            PopupManager.Instance?.ShowError(message);
         }
 
         void Close() => Destroy(gameObject);
-
-        void Update()
-        {
-            if (refreshCooldownText == null || refreshButton == null) return;
-            if (lastRefreshTime <= 0f) { refreshCooldownText.text = ""; refreshButton.interactable = true; return; }
-            float remaining = refreshCooldownSeconds - (Time.time - lastRefreshTime);
-            if (remaining > 0)
-            {
-                refreshCooldownText.text = $"Refresh ({remaining:F0}s)";
-                refreshButton.interactable = false;
-            }
-            else
-            {
-                refreshCooldownText.text = "";
-                refreshButton.interactable = true;
-            }
-        }
     }
 }

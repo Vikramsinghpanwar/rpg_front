@@ -3,13 +3,16 @@ using UnityEngine;
 using UnityEngine.UI;
 using Core.Bootstrap;
 using Core.Utils;
+using Features.Profile.Services;
+using System;
 
 namespace Features.Profile.UI
 {
     public class ProfileScreen : MonoBehaviour
     {
         [Header("Buttons")]
-        [SerializeField] private Button editProfileButton;
+        [SerializeField] private Button editUsernameButton;
+        [SerializeField] private Button editAvatarButton;
 
         [Header("TMP References")]
         [SerializeField] private TMP_Text nNameTMP;
@@ -21,15 +24,28 @@ namespace Features.Profile.UI
         [Header("Profile Image")]
         [SerializeField] private Image profileImage;
 
-        [Header("Profile Image Selector")]
-        [SerializeField] private ProfileImageSelector profileImageSelector;
+        [Header("Profile Edit Popups")]
+        [SerializeField] private UsernameEditPopup usernameEditPopup;
+        [SerializeField] private AvatarChangePopup avatarChangePopup;
 
-        void EditProfile()
+        void EditUsername()
         {
-            if (profileImageSelector != null)
+            if (usernameEditPopup != null)
             {
-                profileImageSelector.SelectProfilePicture();
+                usernameEditPopup.Open();
+                return;
             }
+            Debug.LogWarning("[ProfileScreen] UsernameEditPopup reference not assigned");
+        }
+
+        void EditAvatar()
+        {
+            if (avatarChangePopup != null)
+            {
+                avatarChangePopup.Open();
+                return;
+            }
+            Debug.LogWarning("[ProfileScreen] AvatarChangePopup reference not assigned");
         }
 
         void Start()
@@ -39,7 +55,8 @@ namespace Features.Profile.UI
 
         void Awake()
         {
-            if (editProfileButton != null) editProfileButton.onClick.AddListener(EditProfile);
+            if (editUsernameButton != null) editUsernameButton.onClick.AddListener(EditUsername);
+            if (editAvatarButton != null) editAvatarButton.onClick.AddListener(EditAvatar);
         }
 
         void OnEnable()
@@ -66,8 +83,8 @@ namespace Features.Profile.UI
 
             var profile = BootstrapService.Instance.Profile;
             var wallet = BootstrapService.Instance.Wallet;
-            Debug.Log($"[ProfileScreen] Complete Profile data: {profile}");
-            Debug.Log($"[ProfileScreen] Complete Wallet data: {wallet}");
+            // Debug.Log($"[ProfileScreen] Complete Profile data: {profile}");
+            // Debug.Log($"[ProfileScreen] Complete Wallet data: {wallet}");
             if (profile != null)
             {
                 if (nNameTMP != null) nNameTMP.text = profile.username;
@@ -76,12 +93,22 @@ namespace Features.Profile.UI
                 {
                     mobileNumberTMP.text = string.IsNullOrEmpty(profile.mobile_number) ? "Mobile number not set" : profile.mobile_number;
                 }
-                // ADD THIS: Load avatar sprite if available
+
                 if (profileImage != null && !string.IsNullOrEmpty(profile.avatar))
                 {
-                    // Assuming avatar is a sprite name or resource path
-                    var avatarSprite = Resources.Load<Sprite>(profile.avatar);
-                    if (avatarSprite != null) profileImage.sprite = avatarSprite;
+                    var fallback = Resources.Load<Sprite>(profile.avatar);
+                    if (fallback != null)
+                    {
+                        profileImage.sprite = fallback;
+                    }
+                    else
+                    {
+                        LoadRemoteAvatarAsync(profile.avatar);
+                    }
+                }
+                else if (profileImage != null)
+                {
+                    profileImage.sprite = null;
                 }
             }
 
@@ -89,6 +116,22 @@ namespace Features.Profile.UI
             {
                 if (walletTMP != null) walletTMP.text = MoneyFormatter.FormatPaisa(wallet.deposit_balance + wallet.win_balance);
                 if (bonusBalanceTMP != null) bonusBalanceTMP.text = MoneyFormatter.FormatPaisa(wallet.bonus_balance);
+            }
+        }
+
+        async void LoadRemoteAvatarAsync(string avatarUrl)
+        {
+            try
+            {
+                var sprite = await AvatarLoader.LoadRemoteAsync(avatarUrl);
+                if (sprite != null && profileImage != null)
+                {
+                    profileImage.sprite = sprite;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ProfileScreen] Remote avatar load failed: {ex.Message}");
             }
         }
     }

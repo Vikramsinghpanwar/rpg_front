@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using Core.Utils;
 public class PeopleBetCrash : MonoBehaviour
 {
 
@@ -32,7 +33,7 @@ public class PeopleBetCrash : MonoBehaviour
         do
         {
             jackpotAmount += Random.Range(100, 1000);
-            jackpotText.text = "Jackpot : " + jackpotAmount;
+            jackpotText.text = "Jackpot : " + MoneyFormatter.FormatPaisa(jackpotAmount);
             yield return new WaitForSeconds(Random.Range(0.5f, 1f));
         }
         while (_burstChk);

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using Core.Utils;
 
 public class Bets : MonoBehaviour
 {
@@ -44,14 +45,13 @@ public class Bets : MonoBehaviour
     }
     public void BetOn(int val)
     {
-        if(managerScript.gamePhase != "Betting")
+        if (managerScript.gamePhase != "Betting")
         {
             return;
         }
-        if (bManagerScript.betVal < managerScript.walletAmount)
+        if (bManagerScript.betVal * 100 < managerScript.walletAmount)
         {
             PlaceBet(val);
-
         }
     }
 
@@ -59,7 +59,7 @@ public class Bets : MonoBehaviour
     {
 
         managerScript.walletAmount += totalBetAmt;
-        managerScript.walletTxt.text = "₹" + managerScript.walletAmount.ToString("F2");
+        managerScript.walletTxt.text = MoneyFormatter.FormatPaisa((long)(managerScript.walletAmount * 100));
 
         totalBetAmt = 0;
         totalBetAmtTxt.text = "0";
@@ -74,7 +74,7 @@ public class Bets : MonoBehaviour
         betsOnList12.Clear();
 
         Clear_myBetCoins();
-        managerScript._isBetPlaced = false;        
+        managerScript._isBetPlaced = false;
         socketManagerRef.ClearAllBets();
         PlayerPrefs.SetInt("roulette_totalBets", 0);
 
@@ -91,11 +91,11 @@ public class Bets : MonoBehaviour
             return;
         }
 
-        if (bManagerScript.betVal < managerScript.walletAmount)
+        if (bManagerScript.betVal * 100 < managerScript.walletAmount)
         {
             managerScript._isBetPlaced = true;
-            totalBetAmt += bManagerScript.betVal;
-            totalBetAmtTxt.text = totalBetAmt.ToString();
+            totalBetAmt += bManagerScript.betVal * 100f;
+            totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)totalBetAmt);
             GameObject gm = Instantiate(coinPrefabs[bManagerScript.betChipNum - 1], transform);
             gm.transform.position = betPosObjectsList2H[val].position;
             betsOnList2.Add(new BetDetails
@@ -106,12 +106,10 @@ public class Bets : MonoBehaviour
 
             betsOnList2.Add(new BetDetails
             { betAmount = bManagerScript.betVal, betOn = val + 3 });
+            UpdateWallet();
 
-            managerScript.walletAmount -= bManagerScript.betVal;
-            managerScript.walletTxt.text = "₹" + managerScript.walletAmount.ToString("F2");
-
-            socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal/2f);
-            socketManagerRef.SendBetDataToServer(val+3, bManagerScript.betVal/2f);
+            socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal * 100f / 2f);
+            socketManagerRef.SendBetDataToServer(val + 3, bManagerScript.betVal * 100f / 2f);
         }
     }
 
@@ -124,11 +122,11 @@ public class Bets : MonoBehaviour
             return;
         }
 
-        if (bManagerScript.betVal < managerScript.walletAmount)
+        if (bManagerScript.betVal * 100 < managerScript.walletAmount)
         {
             managerScript._isBetPlaced = true;
-            totalBetAmt += bManagerScript.betVal;
-            totalBetAmtTxt.text = totalBetAmt.ToString();
+            totalBetAmt += bManagerScript.betVal * 100f;
+            totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)totalBetAmt);
             GameObject gm = Instantiate(coinPrefabs[bManagerScript.betChipNum - 1], transform);
             gm.transform.position = betPosObjectsList2V[val].position;
             betsOnList2.Add(new BetDetails
@@ -140,11 +138,9 @@ public class Bets : MonoBehaviour
             betsOnList2.Add(new BetDetails
             { betAmount = bManagerScript.betVal, betOn = val + 1 });
 
-            managerScript.walletAmount -= bManagerScript.betVal;
-            managerScript.walletTxt.text = "₹" + managerScript.walletAmount.ToString("F2");
-
-            socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal / 2f);
-            socketManagerRef.SendBetDataToServer(val + 1, bManagerScript.betVal / 2f);
+            UpdateWallet();
+            socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal * 100f / 2f);
+            socketManagerRef.SendBetDataToServer(val + 1, bManagerScript.betVal * 100f / 2f);
         }
     }
 
@@ -159,11 +155,11 @@ public class Bets : MonoBehaviour
             return;
         }
 
-        if (bManagerScript.betVal < managerScript.walletAmount)
+        if (bManagerScript.betVal * 100 < managerScript.walletAmount)
         {
             managerScript._isBetPlaced = true;
-            totalBetAmt += bManagerScript.betVal;
-            totalBetAmtTxt.text = totalBetAmt.ToString();
+            totalBetAmt += bManagerScript.betVal * 100f;
+            totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)totalBetAmt);
             GameObject gm = Instantiate(coinPrefabs[bManagerScript.betChipNum - 1], transform);
             gm.transform.position = betPosObjectsList3[(val - 1) / 3].position;
 
@@ -181,13 +177,19 @@ public class Bets : MonoBehaviour
             betsOnList3.Add(new BetDetails
             { betAmount = bManagerScript.betVal, betOn = val + 2 });
 
-            managerScript.walletAmount -= bManagerScript.betVal;
-            managerScript.walletTxt.text = "₹" + managerScript.walletAmount.ToString("F2");
-
-            socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal / 3f);
-            socketManagerRef.SendBetDataToServer(val + 1, bManagerScript.betVal / 3f);
-            socketManagerRef.SendBetDataToServer(val + 2, bManagerScript.betVal / 3f);
+            UpdateWallet();
+            socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal * 100f / 3f);
+            socketManagerRef.SendBetDataToServer(val + 1, bManagerScript.betVal * 100f / 3f);
+            socketManagerRef.SendBetDataToServer(val + 2, bManagerScript.betVal * 100f / 3f);
         }
+
+
+    }
+
+    void UpdateWallet()
+    {
+        managerScript.walletAmount -= bManagerScript.betVal * 100f;
+        managerScript.walletTxt.text = MoneyFormatter.FormatPaisa((long)managerScript.walletAmount);
     }
 
     public void ZeroTriplePair(int val)
@@ -198,11 +200,11 @@ public class Bets : MonoBehaviour
             return;
         }
 
-        if (bManagerScript.betVal < managerScript.walletAmount)
+        if (bManagerScript.betVal * 100 < managerScript.walletAmount)
         {
             managerScript._isBetPlaced = true;
-            totalBetAmt += bManagerScript.betVal;
-            totalBetAmtTxt.text = totalBetAmt.ToString();
+            totalBetAmt += bManagerScript.betVal * 100f;
+            totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)totalBetAmt);
             GameObject gm = Instantiate(coinPrefabs[bManagerScript.betChipNum - 1], transform);
 
             gm.transform.position = betPosObjectsList3[11 + val].position;
@@ -221,12 +223,10 @@ public class Bets : MonoBehaviour
             PlayerPrefs.SetInt("roulette_totalBets", (int)totalBetAmt);
             PlayerPrefs.SetString("roulette_roundId", socketManagerRef.currentRoundId);
 
-            managerScript.walletAmount -= bManagerScript.betVal;
-            managerScript.walletTxt.text = "₹" + managerScript.walletAmount.ToString("F2");
-
-            socketManagerRef.SendBetDataToServer(0, bManagerScript.betVal / 2f);
-            socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal / 2f);
-            socketManagerRef.SendBetDataToServer(val + 1, bManagerScript.betVal / 2f);
+            UpdateWallet();
+            socketManagerRef.SendBetDataToServer(0, bManagerScript.betVal * 100f / 2f);
+            socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal * 100f / 2f);
+            socketManagerRef.SendBetDataToServer(val + 1, bManagerScript.betVal * 100f / 2f);
 
         }
     }
@@ -240,11 +240,11 @@ public class Bets : MonoBehaviour
         }
 
 
-        if (bManagerScript.betVal < managerScript.walletAmount)
+        if (bManagerScript.betVal * 100 < managerScript.walletAmount)
         {
             managerScript._isBetPlaced = true;
-            totalBetAmt += bManagerScript.betVal;
-            totalBetAmtTxt.text = totalBetAmt.ToString();
+            totalBetAmt += bManagerScript.betVal * 100f;
+            totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)totalBetAmt);
             GameObject gm = Instantiate(coinPrefabs[bManagerScript.betChipNum - 1], transform);
             gm.transform.position = betPosObjectsList2H[33 + val].position;
             betsOnList2.Add(new BetDetails
@@ -256,11 +256,9 @@ public class Bets : MonoBehaviour
             betsOnList2.Add(new BetDetails
             { betAmount = bManagerScript.betVal, betOn = val });
 
-            managerScript.walletAmount -= bManagerScript.betVal;
-            managerScript.walletTxt.text = "₹" + managerScript.walletAmount.ToString("F2");
-
-            socketManagerRef.SendBetDataToServer(0, bManagerScript.betVal / 2f);
-            socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal / 2f);
+            UpdateWallet();
+            socketManagerRef.SendBetDataToServer(0, bManagerScript.betVal * 100f / 2f);
+            socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal * 100f / 2f);
 
         }
     }
@@ -277,11 +275,11 @@ public class Bets : MonoBehaviour
         }
 
 
-        if (bManagerScript.betVal < managerScript.walletAmount)
+        if (bManagerScript.betVal * 100 < managerScript.walletAmount)
         {
             managerScript._isBetPlaced = true;
-            totalBetAmt += bManagerScript.betVal;
-            totalBetAmtTxt.text = totalBetAmt.ToString();
+            totalBetAmt += bManagerScript.betVal * 100f;
+            totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)totalBetAmt);
             GameObject gm = Instantiate(coinPrefabs[bManagerScript.betChipNum - 1], transform);
             gm.transform.position = betPosObjectsList4[CoinPos4(val)].position;
             betsOnList4.Add(new BetDetails
@@ -302,14 +300,12 @@ public class Bets : MonoBehaviour
             betsOnList4.Add(new BetDetails
             { betAmount = bManagerScript.betVal, betOn = val + 4 });
 
-            managerScript.walletAmount -= bManagerScript.betVal;
-            managerScript.walletTxt.text = "₹" + managerScript.walletAmount.ToString("F2");
+            UpdateWallet();
 
-
-            socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal / 4f);
-            socketManagerRef.SendBetDataToServer(val + 1, bManagerScript.betVal / 4f);
-            socketManagerRef.SendBetDataToServer(val + 3, bManagerScript.betVal / 4f);
-            socketManagerRef.SendBetDataToServer(val + 4, bManagerScript.betVal / 4f);
+            socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal * 100f / 4f);
+            socketManagerRef.SendBetDataToServer(val + 1, bManagerScript.betVal * 100f / 4f);
+            socketManagerRef.SendBetDataToServer(val + 3, bManagerScript.betVal * 100f / 4f);
+            socketManagerRef.SendBetDataToServer(val + 4, bManagerScript.betVal * 100f / 4f);
 
         }
     }
@@ -328,11 +324,11 @@ public class Bets : MonoBehaviour
         }
 
 
-        if (bManagerScript.betVal < managerScript.walletAmount)
+        if (bManagerScript.betVal * 100 < managerScript.walletAmount)
         {
             managerScript._isBetPlaced = true;
-            totalBetAmt += bManagerScript.betVal;
-            totalBetAmtTxt.text = totalBetAmt.ToString();
+            totalBetAmt += bManagerScript.betVal * 100f;
+            totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)totalBetAmt);
             GameObject gm = Instantiate(coinPrefabs[bManagerScript.betChipNum - 1], transform);
             gm.transform.position = betPosObjectsList6[val].position;
 
@@ -343,12 +339,11 @@ public class Bets : MonoBehaviour
                 int v = (val * 3) + 1 + i;
                 betsOnList6.Add(new BetDetails
                 { betAmount = bManagerScript.betVal, betOn = v });
-                socketManagerRef.SendBetDataToServer(v, bManagerScript.betVal / 6f);
+                socketManagerRef.SendBetDataToServer(v, bManagerScript.betVal * 100f / 6f);
 
             }
 
-            managerScript.walletAmount -= bManagerScript.betVal;
-            managerScript.walletTxt.text = "₹" + managerScript.walletAmount.ToString("F2");
+            UpdateWallet();
         }
     }
 
@@ -360,8 +355,8 @@ public class Bets : MonoBehaviour
         /*if (bManagerScript.betVal < managerScript.walletAmount)
         {
             managerScript._isBetPlaced = true;
-            totalBetAmt += bManagerScript.betVal;
-            totalBetAmtTxt.text = totalBetAmt.ToString();
+            totalBetAmt += bManagerScript.betVal * 100f;
+            totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)totalBetAmt);
             GameObject gm = Instantiate(coinPrefabs[bManagerScript.betChipNum - 1], transform);
             gm.transform.position = betPosObjectsList12[val].position;
             for (int i = 0; i < 12; i++)
@@ -371,7 +366,7 @@ public class Bets : MonoBehaviour
 
             }
             managerScript.walletAmount -= bManagerScript.betVal;
-            managerScript.walletTxt.text = "₹" + managerScript.walletAmount.ToString("F2");
+            managerScript.walletTxt.text = MoneyFormatter.FormatPaisa((long)(managerScript.walletAmount * 100));
 
         }*/
     }
@@ -398,13 +393,13 @@ public class Bets : MonoBehaviour
     {
 
         managerScript._isBetPlaced = true;
-        totalBetAmt += bManagerScript.betVal;
-        totalBetAmtTxt.text = totalBetAmt.ToString();
-        GameObject g = Instantiate(coinPrefabs[bManagerScript.betChipNum -1], transform);
+        totalBetAmt += bManagerScript.betVal * 100f;
+        totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)totalBetAmt);
+        GameObject g = Instantiate(coinPrefabs[bManagerScript.betChipNum - 1], transform);
         g.transform.position = betPosObjectsList[val].position;
         myBetCoinsList.Add(g);
         betsOnList.Add(new BetDetails
-        { 
+        {
             betAmount = bManagerScript.betVal,
             betOn = val
         });
@@ -412,9 +407,8 @@ public class Bets : MonoBehaviour
         PlayerPrefs.SetString("roulette_roundId", socketManagerRef.currentRoundId);
 
         PlayerPrefs.SetInt("roulette_totalBets", (int)totalBetAmt);
-        socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal);
-        managerScript.walletAmount -= bManagerScript.betVal;
-        managerScript.walletTxt.text = "₹" +  managerScript.walletAmount.ToString("F2");
+        socketManagerRef.SendBetDataToServer(val, bManagerScript.betVal * 100f);
+        UpdateWallet();
     }
 
     int CoinPos4(int val)
@@ -435,7 +429,7 @@ public class Bets : MonoBehaviour
 
     public void Clear_myBetCoins()
     {
-        for(int i = 0; i<myBetCoinsList.Count; i++)
+        for (int i = 0; i < myBetCoinsList.Count; i++)
         {
             Destroy(myBetCoinsList[i].gameObject);
         }

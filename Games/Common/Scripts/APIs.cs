@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Core.Config;
@@ -11,36 +12,12 @@ public class APIs : MonoBehaviour
 
     public void FetchWallet()
     {
-        StartCoroutine(RechResultRech());
+        //StartCoroutine(RechResultRech());
     }
-    IEnumerator RechResultRech()
+
+    internal void FetchtWallet()
     {
-        string token = UserDetail.Token;
-        string url = ServerConfig.BaseUrl + "/api/livewalletdata.php";
-        WWWForm form = new WWWForm();
-        form.AddField("verToken", token);
-        using (UnityWebRequest www = UnityWebRequest.Post(url, form))
-        {
-            yield return www.SendWebRequest();
-            if (www.result == UnityWebRequest.Result.Success && www.responseCode == 200)
-            {
-                string jsonResponse = www.downloadHandler.text;
-                Debug.Log("Wallet Fetched Res. : " + jsonResponse);
-                //-----------------------------------------------------------------------------//
-                
-                WalletData[] witharray = JsonHelper.FromJson<WalletData>(jsonResponse);
-                if(witharray[0].status == 4)
-                {
-                    SceneManager.LoadScene(0);
-                    yield break;
-                }
-                
-                float myWallet = witharray[0].wallet + witharray[0].WinAmount + witharray[0].bonus;
-                OnWalletFetched?.Invoke(myWallet);
-                Wallet.teenpattiV_Pool = witharray[0].pool_teenpatti;
-            }
-            else Debug.Log("unable to fetch wallet");
-        }
+        throw new NotImplementedException();
     }
 }
 

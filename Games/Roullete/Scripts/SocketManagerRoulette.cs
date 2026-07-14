@@ -6,7 +6,10 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.Threading.Tasks;
+using Core.API;
 using Core.Config;
+using Core.Services;
 using Features.Lobby.Integration;
 
 public class SocketManagerRoulette : MonoBehaviour
@@ -87,7 +90,7 @@ public class SocketManagerRoulette : MonoBehaviour
         {
             Query = new Dictionary<string, string>
             {
-                {"token", "UNITY" }
+                {"token", TokenProvider.Instance?.AccessToken ?? string.Empty}
             },
             Transport = SocketIOClient.Transport.TransportProtocol.WebSocket
         });
@@ -284,31 +287,28 @@ public class SocketManagerRoulette : MonoBehaviour
         int[] botWinArray = botWinA.ToObject<int[]>();
         int winNum = (int)gameResult["winNumber"];
         manager.DisplayResult(winNum, botWinArray);
+        _ = CGSBetService.Instance.RefreshWalletAsync();
     }
     public void SendBetDataToServer(int betOn, float betAmount)
     {
-        var data = new Dictionary<string, object>
-        {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-            { "betOn", betOn },
-            { "roomName", roomName },
-            { "betAmount", betAmount }
-
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("sendData", jsonData);
+        _ = SendBetAsync(betOn, betAmount);
     }
+
+    async Task SendBetAsync(int betOn, float betAmount)
+    {
+        try
+        {
+            await CGSBetService.Instance.PlaceBetAsync(CGSGameKeys.Roulette, betOn, (long)betAmount, tableCode: roomName);
+        }
+        catch (ApiException ex)
+        {
+            Debug.LogWarning($"[SocketManagerRoulette] Bet rejected: {ex.StatusCode} {ex.Message}");
+        }
+    }
+
     public void ClearAllBets()
     {
-        var data = new Dictionary<string, object>
-        {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-            { "roomName", roomName },
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("clearAllBet", jsonData);
+        // Bets are HTTP-authoritative — no socket emit needed for clear
     }
 
 

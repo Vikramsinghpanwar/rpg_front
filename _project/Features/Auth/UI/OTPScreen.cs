@@ -34,14 +34,37 @@ namespace Features.Auth.UI
 
             try
             {
-                await Core.Auth.AuthManager.Instance.VerifyOtp(otpChallengeId, otpIF.text);
-                await Core.Session.SessionManager.Instance.Initialize();
-                errorText.text = "Login success";
-                SceneManager.LoadScene("Lobby");
+                bool ok = await Core.Session.SessionManager.Instance.SignInWithOtp(otpChallengeId, otpIF.text);
+
+                if (!ok)
+                {
+                    Toast.Instance.ShowError("Login failed.");
+                    loadingPanel.SetActive(false);
+                    otpPanel.SetActive(true);
+                    return;
+                }
+
+                if (Core.Session.SessionManager.Instance.VersionGateCleared)
+                {
+                    Toast.Instance.ShowSuccess("Login successful.");
+
+                    string fcmToken = PlayerPrefs.GetString("fcm_token", null);
+                    if (!string.IsNullOrEmpty(fcmToken))
+                    {
+                        _ = Core.Notifications.DeviceRegistrationService.RegisterDeviceAsync(fcmToken);
+                    }
+                }
+                else
+                {
+                    Toast.Instance.ShowError("Update required or maintenance in progress.");
+                    otpPanel.SetActive(true);
+                    loadingPanel.SetActive(false);
+                }
             }
             catch (Core.API.ApiException ex)
             {
-                errorText.text = ex.Message;
+                Core.Auth.AuthManager.Instance.PendingPromoCode = null;
+                Toast.Instance.ShowError(ex.Message);
                 loadingPanel.SetActive(false);
                 otpPanel.SetActive(true);
             }
@@ -50,6 +73,7 @@ namespace Features.Auth.UI
         public void BackToLogin()
         {
             otpPanel.SetActive(false);
+            Core.Auth.AuthManager.Instance.PendingPromoCode = null;
         }
     }
 }

@@ -13,7 +13,7 @@ namespace Teenpatti
     {
         public static WebSocketClient Instance { get; private set; }
         
-        private WebSocket websocket;
+        public WebSocket websocket;
         public bool isConnecting = false;
         public bool connected = false;
         private bool isIntentionalDisconnect = false;
@@ -38,50 +38,56 @@ namespace Teenpatti
         
         public async Task Connect(string url)
         {
+            string ts = DateTime.Now.ToString("HH:mm:ss.fff");
+            Debug.Log($"[{ts}] [WS] Connect started: url={url ?? "null"}");
             if (isConnecting) return;
-            
+
             isConnecting = true;
-            
+
             try
             {
                 websocket = new WebSocket(url);
-                
+
                 websocket.OnOpen += () =>
                 {
-                    Debug.Log("WebSocket connected!");
+                    string tsOpen = DateTime.Now.ToString("HH:mm:ss.fff");
+                    Debug.Log($"[{tsOpen}] [WS] Connected");
                     isConnecting = false;
                     connected = true;
                     MainThreadDispatcher.Enqueue(() => OnConnected?.Invoke());
                 };
-                
+
                 websocket.OnError += (error) =>
                 {
-                    Debug.LogError($"WebSocket error: {error}");
+                    string tsErr = DateTime.Now.ToString("HH:mm:ss.fff");
+                    Debug.LogError($"[{tsErr}] [WS] OnError: {error}");
                     isConnecting = false;
                     connected = false;
                     MainThreadDispatcher.Enqueue(() => OnDisconnected?.Invoke(error));
                 };
-                
+
                 websocket.OnClose += (code) =>
                 {
-                    Debug.Log($"WebSocket closed with code: {code}");
+                    string tsClose = DateTime.Now.ToString("HH:mm:ss.fff");
+                    Debug.Log($"[{tsClose}] [WS] OnClose fired - code: {code}");
                     isConnecting = false;
                     connected = false;
                     string reason = isIntentionalDisconnect ? "Intentional disconnect" : $"Code: {code}";
                     MainThreadDispatcher.Enqueue(() => OnDisconnected?.Invoke(reason));
                 };
-                
+
                 websocket.OnMessage += (bytes) =>
                 {
                     string message = Encoding.UTF8.GetString(bytes);
                     messageQueue.Enqueue(message);
                 };
-                
+
                 await websocket.Connect();
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Connection failed: {ex.Message}");
+                string tsFail = DateTime.Now.ToString("HH:mm:ss.fff");
+                Debug.LogError($"[{tsFail}] [WS] Connect failed: {ex.Message}");
                 isConnecting = false;
                 MainThreadDispatcher.Enqueue(() => OnDisconnected?.Invoke(ex.Message));
             }
@@ -132,6 +138,8 @@ namespace Teenpatti
         
         public async Task Disconnect()
         {
+            string ts = DateTime.Now.ToString("HH:mm:ss.fff");
+            Debug.Log($"[{ts}] [WS] Disconnect requested (intentional={isIntentionalDisconnect})");
             isIntentionalDisconnect = true;
             if (websocket != null)
             {

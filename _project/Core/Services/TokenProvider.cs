@@ -31,18 +31,17 @@ namespace Core.Services
 
         // Func<string, Task<RefreshResult>> refreshCallback;
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        static void Bootstrap()
+        public static void Initialize()
         {
-            if (Instance != null) return;
-            var go = new GameObject("[TokenProvider]");
-            DontDestroyOnLoad(go);
-            Instance = go.AddComponent<TokenProvider>();
+            if (Instance == null)
+            {
+                var go = new GameObject("[TokenProvider]");
+                DontDestroyOnLoad(go);
+                Instance = go.AddComponent<TokenProvider>();
+            }
             Instance.Load();
         }
 
-        // Storage uses PlayerPrefs for dev. Production must move tokens to platform
-        // secure storage (iOS Keychain / Android EncryptedSharedPreferences) before launch.
         void Load()
         {
             accessToken = PlayerPrefs.GetString(KEY_ACCESS, null);

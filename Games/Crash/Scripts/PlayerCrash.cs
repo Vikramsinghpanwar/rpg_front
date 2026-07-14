@@ -5,6 +5,8 @@ using UnityEngine.UI;
 using TMPro;
 using System.Runtime.InteropServices;
 using Features.Lobby.Integration;
+using Core.Utils;
+using Core.Bootstrap;
 
 public class PlayerCrash : MonoBehaviour
 {
@@ -15,8 +17,8 @@ public class PlayerCrash : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        wallet = BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f;
-        walletText.text = (BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f).ToString("F2");
+        wallet = BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0;
+        walletText.text = MoneyFormatter.FormatPaisa((long)(wallet * 100));
     }
 
     // Update is called once per frame
@@ -27,11 +29,8 @@ public class PlayerCrash : MonoBehaviour
 
     public void UpdateWallet(float val)
     {
-
-        Debug.Log("Updated");
         wallet += val;
-        walletText.text = "₹ " + wallet.ToString("F2");
-        Wallet.AddToWinWallet(val);
+        walletText.text = MoneyFormatter.FormatPaisa((long)(wallet * 100));
     }
 
 }

@@ -15,26 +15,33 @@ namespace Features.Support.UI
         [SerializeField] private Color agentBg;
         [SerializeField] private Image bgImage;
         [SerializeField] private RectTransform contentRect;
+        [SerializeField] private GameObject leftSpacer;
+        [SerializeField] private GameObject rightSpacer;
 
         public void Setup(TicketMessage message, SupportController controller)
         {
-            bool isUser = message.authorType == AuthorType.USER;
-
-            authorText.text = isUser ? "You" : (message.authorName ?? "Support");
-            bodyText.text = message.body;
-            timeText.text = FormatTime(message.createdAt);
-
-            if (bgImage != null)
+            if (authorText != null)
             {
-                bgImage.color = isUser ? userBg : agentBg;
+                authorText.text = message.IsUser ? "You" : (message.authorName ?? "Support");
             }
 
-            // Adjust layout based on author
-            if (contentRect != null)
+            if (bodyText != null)
             {
-                var anchoredPos = contentRect.anchoredPosition;
-                anchoredPos.x = isUser ? 100 : 20;
-                contentRect.anchoredPosition = anchoredPos;
+                bodyText.text = message.body;
+            }
+
+            if (timeText != null)
+            {
+                timeText.text = FormatTime(message.createdAt);
+            }
+            if (bgImage != null)
+            {
+                bgImage.color = message.IsUser ? userBg : agentBg;
+            }
+            if (leftSpacer != null && rightSpacer != null)
+            {
+                leftSpacer.SetActive(message.IsUser);
+                rightSpacer.SetActive(!message.IsUser);
             }
         }
 

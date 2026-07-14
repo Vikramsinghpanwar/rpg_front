@@ -6,6 +6,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
+using Core.Bootstrap;
 
 public class HorseRacingGame : MonoBehaviour
 {
@@ -19,7 +20,7 @@ public class HorseRacingGame : MonoBehaviour
     GameState gamePhase;
     public TextMeshProUGUI jackpotTxt;
     int[] botWinArray;
-    
+
     public Animator[] throwItemAnimators_array;
     private System.Random random1;
     private System.Random random2;
@@ -34,8 +35,8 @@ public class HorseRacingGame : MonoBehaviour
     private int randomValue3 = 0;
     private int randomValue4 = 0;
     private int randomValue5 = 0;
-    private int randomValue6 = 0; 
-    
+    private int randomValue6 = 0;
+
     private bool isGenerating = false;
     public int rvi;
     public GameObject[] winGlow_ObjArray;
@@ -47,36 +48,36 @@ public class HorseRacingGame : MonoBehaviour
     public GameObject winhorse4;
     public GameObject winhorse5;
     public GameObject winhorse6;
-    public Image backgroundImage; 
+    public Image backgroundImage;
     public float bgMoveFactor = 0.5f;
-    public float raceDistance = 800f; 
+    public float raceDistance = 800f;
     public float raceDuration = 8f;
 
     public TextMeshProUGUI[] betAmountStatus_Txt_Array;
-    public Image[] horseImages;  
-    public TextMeshProUGUI[] horseMultiplierText ,horseMultiplierTextOnGround , winMultiplierText; 
+    public Image[] horseImages;
+    public TextMeshProUGUI[] horseMultiplierText, horseMultiplierTextOnGround, winMultiplierText;
     public GameObject leading_HorseLine_IMG;
     public TextMeshProUGUI leadingHorseNumber_TMP;
-    public GameObject startPointImage , secoundHorseMultiplierPanelOnGround;
+    public GameObject startPointImage, secoundHorseMultiplierPanelOnGround;
 
-    private Vector3 startExtraPosition; 
-    private Vector3 bgStartPos; 
+    private Vector3 startExtraPosition;
+    private Vector3 bgStartPos;
 
-    
 
-    public TextMeshProUGUI timer_text; 
+
+    public TextMeshProUGUI timer_text;
     public GameObject countdownPanel;
-   
 
-    public bool isBettingAllowed = false; 
 
-   
-    private float[] horseMultipliers  = new float[6];
-  
+    public bool isBettingAllowed = false;
+
+
+    private float[] horseMultipliers = new float[6];
+
     private Vector3[] originalPositions; // Array to store original positions of horses
 
-    private float[] betsAmount_Array; 
-    private  int horseCount = 6;
+    private float[] betsAmount_Array;
+    private int horseCount = 6;
 
     public Resulthistroy resulthistroy;
 
@@ -88,7 +89,7 @@ public class HorseRacingGame : MonoBehaviour
 
     public GameObject showWinPanel;
     public TextMeshProUGUI showWinText;
-    
+
     float totalWinnings = 0;
 
     bool isRaceRunning = false;
@@ -105,9 +106,8 @@ public class HorseRacingGame : MonoBehaviour
     /// </summary>
     void Start()
     {
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
-        apisRef.FetchWallet();
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
+
         betManagerRef = FindFirstObjectByType<BetManager>();
         socketManagerHR = FindObjectOfType<SocketManagerHR>();
         botManagerRef = FindObjectOfType<TableBotManager>();
@@ -130,7 +130,7 @@ public class HorseRacingGame : MonoBehaviour
     }
 
     #region socket 
-    public void StartBetting(float remTime,long startTime, string[] seeds, long jakcpotVal)
+    public void StartBetting(float remTime, long startTime, string[] seeds, long jakcpotVal)
     {
         ResetBetAmount();
         gamePhase = GameState.Betting;
@@ -157,7 +157,7 @@ public class HorseRacingGame : MonoBehaviour
     public void GameResult(int winIndex, int[] botWA)
     {
         if (waitingForNext.activeInHierarchy) return;
-        
+
         botWinArray = new int[6];
         for (int i = 0; i < botWA.Length; i++)
         {
@@ -176,15 +176,15 @@ public class HorseRacingGame : MonoBehaviour
     }
 
     public void UpdateHistory(int[] history)
-{
-    
-    resulthistroy.InitializeResults(history.Length); 
-        for(int i = history.Length -1 ; i>0; i--)
+    {
+
+        resulthistroy.InitializeResults(history.Length);
+        for (int i = history.Length - 1; i > 0; i--)
         {
             resulthistroy.AddResultToHistory(history[i]);
         }
-  
-}
+
+    }
 
     private void StoreOriginalPositions()
     {
@@ -192,28 +192,28 @@ public class HorseRacingGame : MonoBehaviour
         for (int i = 0; i < horseImages.Length; i++)
         {
             originalPositions[i] = horseImages[i].transform.localPosition;
-              startExtraPosition = leading_HorseLine_IMG.transform.localPosition;
-               bgStartPos = backgroundImage.transform.localPosition;
+            startExtraPosition = leading_HorseLine_IMG.transform.localPosition;
+            bgStartPos = backgroundImage.transform.localPosition;
         }
-        
 
-      
+
+
     }
 
     IEnumerator GameLoop(long startTime, string[] seeds)
     {
-          winhorse1.SetActive(false);  
-                    winhorse2.SetActive(false);
-                    winhorse3.SetActive(false);  
-                    winhorse4.SetActive(false);
-                    winhorse5.SetActive(false);  
-                    winhorse6.SetActive(false);
+        winhorse1.SetActive(false);
+        winhorse2.SetActive(false);
+        winhorse3.SetActive(false);
+        winhorse4.SetActive(false);
+        winhorse5.SetActive(false);
+        winhorse6.SetActive(false);
 
 
         yield return new WaitForSeconds(1f);
         BetAmountIncrease(startTime, seeds);
 
-        yield return null;                   
+        yield return null;
     }
 
 
@@ -235,10 +235,10 @@ public class HorseRacingGame : MonoBehaviour
     }
 
 
-    IEnumerator StartCountdown(float timeRem )
+    IEnumerator StartCountdown(float timeRem)
     {
-       
-   
+
+
 
         yield return new WaitForSeconds(timeRem + 1);
         timer_text.text = "0";
@@ -246,7 +246,7 @@ public class HorseRacingGame : MonoBehaviour
 
 
         isBettingAllowed = false;
-  
+
         burstRef.StopAnim();
     }
 
@@ -256,7 +256,7 @@ public class HorseRacingGame : MonoBehaviour
         {
             foreach (var animator in horseAnimation)
             {
-                StartCoroutine(HorseIdleAnimationEnum(animator));                
+                StartCoroutine(HorseIdleAnimationEnum(animator));
             }
         }
     }
@@ -270,8 +270,9 @@ public class HorseRacingGame : MonoBehaviour
         yield return new WaitForSeconds(Random.Range(0, 3f));
         animator.SetBool("_idle", true);
     }
-    private void playRunAnm(){
-       if (isRaceRunning) // Only play the run animation if the race is running
+    private void playRunAnm()
+    {
+        if (isRaceRunning) // Only play the run animation if the race is running
         {
             foreach (var animator in horseAnimation)
             {
@@ -343,7 +344,7 @@ public class HorseRacingGame : MonoBehaviour
                 }
             }
 
-         
+
             // Determine new leader based on progress or random chance
             leadingHorseID = GetLeadingHorseID();
             UpdateLeadingHorseVisibility(leadingHorseID, previousLeadingHorseID);
@@ -359,13 +360,13 @@ public class HorseRacingGame : MonoBehaviour
             yield return null;
         }
 
-        foreach(Animator a in horseAnimation)
+        foreach (Animator a in horseAnimation)
         {
             a.speed = 0.01f;
         }
         //winLine.SetActive(true);
         yield return new WaitForSeconds(2f);
-     
+
         foreach (Animator a in horseAnimation)
         {
             a.speed = 1f;
@@ -379,7 +380,7 @@ public class HorseRacingGame : MonoBehaviour
         HorseIdleAnimation();
         CalculatePayout(winIndex);
         ResetGame();
-        for (int i = 0; i< horseImages.Length; i++)
+        for (int i = 0; i < horseImages.Length; i++)
         {
             horseImages[i].transform.localPosition = new Vector3(1000f, startPositions[i].y, startPositions[i].z);
         }
@@ -421,7 +422,7 @@ public class HorseRacingGame : MonoBehaviour
         leadingHorseNumber_TMP.text = (leadingHorseID + 1).ToString();
         if (leadingHorseID != previousLeadingHorseID)
         {
-         
+
 
         }
     }
@@ -435,7 +436,7 @@ public class HorseRacingGame : MonoBehaviour
 
         startPointImage.SetActive(true);
         leading_HorseLine_IMG.SetActive(false);
-         isRaceRunning = false;
+        isRaceRunning = false;
     }
 
 
@@ -445,26 +446,26 @@ public class HorseRacingGame : MonoBehaviour
         if (!isBettingAllowed)
         {
             Debug.Log("Betting is not allowed at this time.");
-            return; 
+            return;
         }
 
-        
+
         if (walletAmount < betManagerRef.betVal)
         {
-            Debug.Log("Not enough balance to place this bet."); 
-           // payoutText.text = "Not enough balance to place this bet."; 
-            return; 
+            Debug.Log("Not enough balance to place this bet.");
+            // payoutText.text = "Not enough balance to place this bet."; 
+            return;
         }
 
-     
-        betsAmount_Array[horseID] += betManagerRef.betVal; 
-        DeductBetAmount(); 
+
+        betsAmount_Array[horseID] += betManagerRef.betVal;
+        DeductBetAmount();
         Debug.Log("Horse selected for betting: " + (horseID + 1) + ", Total Bet: " + betsAmount_Array[horseID]);
-         socketManagerHR.SendBetDataToServer(horseID , betManagerRef.betVal);
+        socketManagerHR.SendBetDataToServer(horseID, betManagerRef.betVal);
     }
 
 
-   
+
     private void DeductBetAmount()
     {
         if (walletAmount >= betManagerRef.betVal)
@@ -474,7 +475,7 @@ public class HorseRacingGame : MonoBehaviour
         }
         else
         {
-           // payoutText.text = "Not enough balance to place this bet."; // Update UI message
+            // payoutText.text = "Not enough balance to place this bet."; // Update UI message
         }
     }
 
@@ -486,7 +487,6 @@ public class HorseRacingGame : MonoBehaviour
         {
             if (f > 0)
             {
-                apisRef.FetchWallet();
             }
         }
         for (int i = 0; i < horseCount; i++)
@@ -511,7 +511,7 @@ public class HorseRacingGame : MonoBehaviour
         }
     }
 
-    IEnumerator ShowWinAmount ()
+    IEnumerator ShowWinAmount()
     {
         winAudioSource.Play();
         showWinPanel.SetActive(true);
@@ -519,7 +519,7 @@ public class HorseRacingGame : MonoBehaviour
         yield return new WaitForSeconds(3f);
         showWinPanel.SetActive(false);
     }
- 
+
 
 
     private void WinHorseNumberShow(int winIndex)
@@ -527,28 +527,33 @@ public class HorseRacingGame : MonoBehaviour
         if (winIndex == 0)
         {
             winhorse1.SetActive(true);
-  
-        }else if(winIndex == 1)
+
+        }
+        else if (winIndex == 1)
         {
             winhorse2.SetActive(true);
-            
-            
-        }else if(winIndex == 2)
+
+
+        }
+        else if (winIndex == 2)
         {
             winhorse3.SetActive(true);
-         
-        }else if(winIndex == 3)
+
+        }
+        else if (winIndex == 3)
         {
             winhorse4.SetActive(true);
 
-        }else if(winIndex == 4)
+        }
+        else if (winIndex == 4)
         {
             winhorse5.SetActive(true);
-          
-        }else if(winIndex == 5)
+
+        }
+        else if (winIndex == 5)
         {
             winhorse6.SetActive(true);
-           
+
         }
 
 
@@ -571,13 +576,13 @@ public class HorseRacingGame : MonoBehaviour
 
 
     private void ResetGame()
-    {        
+    {
 
         for (int i = 0; i < horseImages.Length; i++)
         {
             horseImages[i].transform.localPosition = originalPositions[i];
-             leading_HorseLine_IMG.transform.localPosition = startExtraPosition;
-            backgroundImage.transform.localPosition = bgStartPos;            
+            leading_HorseLine_IMG.transform.localPosition = startExtraPosition;
+            backgroundImage.transform.localPosition = bgStartPos;
         }
 
         HorseIdleAnimation();
@@ -693,7 +698,7 @@ public class HorseRacingGame : MonoBehaviour
             betAmountStatus_Txt_Array[3].text = $"<color=yellow>{betsAmount_Array[3]}</color><color=#02ccfe>/{n}</color>";
             betAmountStatus_Txt_Array[4].text = $"<color=yellow>{betsAmount_Array[4]}</color><color=#02ccfe>/{o}</color>";
             betAmountStatus_Txt_Array[5].text = $"<color=yellow>{betsAmount_Array[5]}</color><color=#02ccfe>/{p}</color>";
-            
+
             yield return new WaitForSeconds(updateInterval);
         }
     }

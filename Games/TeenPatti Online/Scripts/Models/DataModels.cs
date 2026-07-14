@@ -8,7 +8,8 @@ namespace Teenpatti{
 public class PlayerDetails
 {
     public string id;
-    public string userId;
+    // public string userId;
+    public string publicId;
     public string username;
     public string token;
     public float amount;
@@ -21,7 +22,7 @@ public class PlayerDetails
     public float totalBetAmount;
     public float betAmount;
     public bool participant;
-    public int profileImageIndex;
+    public string profileImageUrl;
     public bool hasFolded = false;
     public bool hasSeenCards = false;
     public int position = 0;

@@ -20,12 +20,15 @@ namespace Core.Config
         }
 
         // Tweak these once. Features should never hard-code URLs.
-        public const string EditorBaseUrl = "http://localhost:8000";
-        public const string DevBaseUrl    = "https://dev-api.example.com";
-        public const string ProdBaseUrl   = "https://api.example.com";
-        public const string SocketUrl   = "https://api.example.com";
-        public const string GatewayUrl   = "https://api.example.com";
-        public const string Downloadable_Assets_Url   = "https://api.example.com";
+        public const string EditorBaseUrl = "https://api.thecrownempire.live";
+        public const string DevBaseUrl = "https://api.thecrownempire.live";
+        public const string ProdBaseUrl = "https://api.thecrownempire.live";
+        public const string SocketUrl = "https://cgs.thecrownempire.live";
+        public const string GatewayUrl = "https://api.example.com";
+        public const string Downloadable_Assets_Url = "https://cre-media-upload.s3.ap-south-1.amazonaws.com/";//"https://api.example.com";
+
+        public const string LandingPageUrl = "https://theblackpearl.online";
+
 
         // WebSocket URL for the realtime gateway. Same env-split pattern.
         public static string RealtimeUrl

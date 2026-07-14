@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using Core.Utils;
 
 public class PeopleBetDT : MonoBehaviour
 {
@@ -75,7 +76,7 @@ public class PeopleBetDT : MonoBehaviour
     public void WalletUpdate()
     {
         wallet = Random.Range(1000, 100000);
-        walletAmtText.text = "Rs. " +  wallet.ToString();
+        walletAmtText.text = MoneyFormatter.FormatPaisa(wallet);
     }
     public void MoveAllcoinsBack()
     {
@@ -181,7 +182,7 @@ public class PeopleBetDT : MonoBehaviour
         {
             wallet -= 15;
         }
-        walletAmtText.text = "Rs. " + wallet.ToString();
+        walletAmtText.text = MoneyFormatter.FormatPaisa(wallet);
         Vector3 targetPosModified = targetPos + new Vector3(Random.Range(-area, area), Random.Range(-area, area), 0);
 
         float startTime = Time.time;

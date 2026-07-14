@@ -7,6 +7,7 @@ using Features.Lobby.Models;
 using Core.Bootstrap;
 using Core.API;
 using Core.API.Endpoints;
+using Core.Models;
 
 namespace Features.Lobby.Controllers
 {
@@ -16,7 +17,13 @@ namespace Features.Lobby.Controllers
         [Tooltip("If true, fetches from public endpoint when no bootstrap data is present.")]
         [SerializeField] private bool fetchPublicWhenEmpty = false;
 
+        [Header("Game Visibility")]
+        [SerializeField] private LobbyGameVisibilityController visibilityController;
+        [SerializeField] private bool useBackendGameConfig = true;
+        [SerializeField] private bool hideUnknownGames = true;
+
         readonly List<LobbyGame> allGames = new List<LobbyGame>();
+        readonly HashSet<string> allowedGameCodes = new HashSet<string>();
 
         public bool HasGames => allGames.Count > 0;
         public IReadOnlyList<LobbyGame> AllGames => allGames;
@@ -28,21 +35,56 @@ namespace Features.Lobby.Controllers
         public LobbyGame FindGameById(string id) => allGames.Find(g => g.id == id);
         public LobbyGame FindGameByName(string name) => allGames.Find(g => g.name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
+        void Awake()
+        {
+            if (visibilityController == null)
+            {
+                visibilityController = GetComponent<LobbyGameVisibilityController>();
+            }
+        }
+
         void OnEnable()
         {
             if (BootstrapService.Instance != null)
+            {
                 BootstrapService.Instance.OnBootstrapUpdated += OnBootstrapUpdated;
+                BootstrapService.Instance.OnBootstrapFailed += OnBootstrapFailed;
+            }
         }
 
         void OnDisable()
         {
             if (BootstrapService.Instance != null)
+            {
                 BootstrapService.Instance.OnBootstrapUpdated -= OnBootstrapUpdated;
+                BootstrapService.Instance.OnBootstrapFailed -= OnBootstrapFailed;
+            }
         }
 
-        void OnBootstrapUpdated(Core.Models.BootstrapResponse response)
+        void OnBootstrapUpdated(BootstrapResponse response)
         {
+            if (useBackendGameConfig)
+            {
+                var gameConfigs = visibilityController?.GetActiveGameConfigs();
+                allowedGameCodes.Clear();
+                if (gameConfigs != null)
+                {
+                    foreach (var config in gameConfigs)
+                    {
+                        if (config != null && !string.IsNullOrEmpty(config.gameCode) && config.enabled && !config.maintenanceMode)
+                        {
+                            allowedGameCodes.Add(config.gameCode);
+                        }
+                    }
+                }
+            }
             _ = InitializeFromBootstrap();
+        }
+
+        void OnBootstrapFailed(string reason)
+        {
+            if (!useBackendGameConfig) return;
+            allowedGameCodes.Clear();
         }
 
         public async Task<bool> InitializeFromBootstrap()
@@ -51,7 +93,7 @@ namespace Features.Lobby.Controllers
 
             if (slice?.games != null && slice.games.Count > 0)
             {
-                SetGames(slice.games);
+                ProcessGames(slice.games);
                 return true;
             }
 
@@ -72,10 +114,9 @@ namespace Features.Lobby.Controllers
 
             if (slice?.games != null)
             {
-                SetGames(slice.games);
+                ProcessGames(slice.games);
                 return true;
             }
-
             return false;
         }
 
@@ -109,7 +150,7 @@ namespace Features.Lobby.Controllers
                 var result = await ApiClient.Instance.Get<BootstrapLobbyGamesSlice>(LobbyRoutes.PublicGames);
                 if (result?.games != null && result.games.Count > 0)
                 {
-                    SetGames(result.games);
+                    ProcessGames(result.games);
                     return true;
                 }
                 OnGamesLoadFailed?.Invoke("no_public_games");
@@ -123,13 +164,28 @@ namespace Features.Lobby.Controllers
             }
         }
 
-        void SetGames(List<LobbyGame> games)
+        void ProcessGames(List<LobbyGame> games)
         {
             allGames.Clear();
-            foreach (var game in games.Where(g => g.is_active))
+
+            if (useBackendGameConfig && allowedGameCodes.Count > 0)
             {
-                allGames.Add(game);
+                var matchedByCode = games.FindAll(g =>
+                    g != null &&
+                    !string.IsNullOrEmpty(g.scene_name) &&
+                    allowedGameCodes.Contains(g.scene_name));
+
+                allGames.AddRange(matchedByCode);
             }
+            else
+            {
+                foreach (var game in games)
+                {
+                    if (game == null) continue;
+                    allGames.Add(game);
+                }
+            }
+
             OnGamesLoaded?.Invoke(allGames);
         }
 

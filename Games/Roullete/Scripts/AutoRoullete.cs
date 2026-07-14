@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine.UI;
 using System.Security.Cryptography;
 using System.Text;
+using Core.Utils;
 
 public class AutoRoullete : MonoBehaviour
 {
@@ -51,7 +52,7 @@ public class AutoRoullete : MonoBehaviour
     {
         timerOjbTmpro.text = "";
         totalBets = 0;
-        totalBetsTxt.text = "₹ " + totalBets;
+        totalBetsTxt.text = MoneyFormatter.FormatPaisa(totalBets);
         betStartOjb.SetActive(true);
 
         yield return new WaitForSeconds(1f);
@@ -176,7 +177,7 @@ public class AutoRoullete : MonoBehaviour
             int k = (randomValue1 * 40);
        
 
-            totalBetsTxt.text = "₹" + k;
+            totalBetsTxt.text = MoneyFormatter.FormatPaisa(k);
 
 
             yield return new WaitForSeconds(updateInterval);

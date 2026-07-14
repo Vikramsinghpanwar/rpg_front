@@ -7,6 +7,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using DG.Tweening;
 using Features.Lobby.Integration;
+using Core.Utils;
+using Core.Bootstrap;
 
 public class JhandiMundaGame : MonoBehaviour
 {
@@ -70,8 +72,8 @@ public class JhandiMundaGame : MonoBehaviour
     TrendHistoryJM trendHistoryJM;
     float walletAmount;
     public TextMeshProUGUI walletText;
+    private bool _resultAnimationComplete;
     public Animator[] throwItemAnimators_array;
-    APIs apisRef;
     public AudioSource SingleCoinSound;
     public AudioSource clockTickSound;
     public Text[] BetAmountText_Array;
@@ -94,20 +96,24 @@ public class JhandiMundaGame : MonoBehaviour
         betManagerRef = FindObjectOfType<BetManager>();
         historyManagerRef = FindObjectOfType<TrendHistoryJM>();
         currentGameState = GameState.Rest;
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
         SocketManagerJMRef = FindObjectOfType<SocketManagerJM>();
         botManagerRef = FindObjectOfType<TableBotManager>();
-        // burst = FindObjectOfType<BurstJM>();
-        trendHistoryJM = FindObjectOfType<TrendHistoryJM>(); // Find TrendHistoryJM
-        apisRef.FetchWallet();
+        trendHistoryJM = FindObjectOfType<TrendHistoryJM>();
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
     }
 
-    private void UpdateWallet(float wAmount)
+    public void UpdateWallet(float wAmount)
     {
         walletAmount = wAmount;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
     }
+
+    public void BeginResultProcessing()
+    {
+        _resultAnimationComplete = false;
+    }
+
+    public bool IsResultAnimationComplete => _resultAnimationComplete;
 
     public void StartBetting(long startTime, string[] seeds, int remTime = 16)
     {
@@ -225,6 +231,8 @@ public class JhandiMundaGame : MonoBehaviour
             g.SetActive(false);
 
         }
+
+        _resultAnimationComplete = true;
     }
 
     void WinAmountDisplayer(int[] winnerArray)
@@ -267,7 +275,6 @@ public class JhandiMundaGame : MonoBehaviour
         if (totalWinAmount > 0)
         {
             ShowWinPopUp(totalWinAmount);
-            UpdateWallet(walletAmount + totalWinAmount);
         }
 
         Debug.Log("bets Array: [" + string.Join(", ", BetAmount_Array) + "]");
@@ -296,7 +303,7 @@ public class JhandiMundaGame : MonoBehaviour
     public void ShowWinPopUp(float winAmount)
     {
         winAmountDisplayer_Object.SetActive(true);
-        winAmountDisplayer_Text.text = winAmount.ToString();
+        winAmountDisplayer_Text.text = MoneyFormatter.FormatPaisa((long)winAmount);
         Invoke("Offwins", 2f);
     }
 
@@ -590,12 +597,12 @@ public class JhandiMundaGame : MonoBehaviour
             int o = (randomValue5 * 550);
             int p = (randomValue6 * 550);
 
-            BetAmountText_Array[0].text = $"<color=yellow>{BetAmount_Array[0]}</color><color=#FFFFFF>/{k}</color>";
-            BetAmountText_Array[1].text = $"<color=yellow>{BetAmount_Array[1]}</color><color=#FFFFFF>/{l}</color>";
-            BetAmountText_Array[2].text = $"<color=yellow>{BetAmount_Array[2]}</color><color=#FFFFFF>/{m}</color>";
-            BetAmountText_Array[3].text = $"<color=yellow>{BetAmount_Array[3]}</color><color=#FFFFFF>/{n}</color>";
-            BetAmountText_Array[4].text = $"<color=yellow>{BetAmount_Array[4]}</color><color=#FFFFFF>/{o}</color>";
-            BetAmountText_Array[5].text = $"<color=yellow>{BetAmount_Array[5]}</color><color=#FFFFFF>/{p}</color>";
+            BetAmountText_Array[0].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)(BetAmount_Array[0]))}</color><color=#FFFFFF>/{k}</color>";
+            BetAmountText_Array[1].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)(BetAmount_Array[1]))}</color><color=#FFFFFF>/{l}</color>";
+            BetAmountText_Array[2].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)(BetAmount_Array[2]))}</color><color=#FFFFFF>/{m}</color>";
+            BetAmountText_Array[3].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)(BetAmount_Array[3]))}</color><color=#FFFFFF>/{n}</color>";
+            BetAmountText_Array[4].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)(BetAmount_Array[4]))}</color><color=#FFFFFF>/{o}</color>";
+            BetAmountText_Array[5].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)(BetAmount_Array[5]))}</color><color=#FFFFFF>/{p}</color>";
 
             yield return new WaitForSeconds(updateInterval);
         }
@@ -679,7 +686,7 @@ public class JhandiMundaGame : MonoBehaviour
         if (totalBets <= 0) return;
 
         walletAmount += totalBets;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
         for (int i = 0; i < BetAmount_Array.Length; i++)
         {
             BetAmount_Array[i] = 0;
@@ -725,13 +732,13 @@ public class JhandiMundaGame : MonoBehaviour
     {
         Debug.Log("cr: " + currentGameState);
         if (currentGameState != GameState.Betting) return;
-        int val = betManagerRef.betVal;
+        int val = betManagerRef.betVal * 100;
         if (val <= walletAmount)
         {
             walletAmount -= val;
             SingleCoinSound.Play();
             PlayerPrefs.SetString("JM_roundId", SocketManagerJMRef.currentRoundId);
-            walletText.text = "₹" + walletAmount.ToString("F2");
+            walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
             InstantiateCoin();
             switch (betOn)
             {

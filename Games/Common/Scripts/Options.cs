@@ -3,135 +3,98 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Runtime.InteropServices;
 using UnityEngine.SceneManagement;
+using Core.Managers;
+using Core.Services;
 
 public class Options : MonoBehaviour
 {
     public GameObject menuPanel;
     public GameObject rulesPanel;
-    public bool _isSound, _isMusic, _isRules;
     public AudioManager audioManagerRef;
     public GameObject musicOff;
     public GameObject soundOff;
     public GameObject vibrationOff;
     public AudioSource tapAudio;
-
-    
-    public void MenuBtn()
-    {
-        tapAudio.Play();
-        if (menuPanel.activeInHierarchy)
-        {
-            menuPanel.SetActive(false);
-        }
-        else
-        {
-            menuPanel.SetActive(true);
-
-        }
-    }
+    bool _isRules;
 
     void Start()
     {
-        if (PlayerPrefs.GetInt("isMusicOn") == 1)
-        {
-            musicOff.SetActive(false);
-        }
-        else
-        {
-            musicOff.SetActive(true);
-        }
+        if (audioManagerRef == null)
+            audioManagerRef = FindObjectOfType<AudioManager>();
 
-        if (PlayerPrefs.GetInt("isSoundOn") == 1)
-        {
-            soundOff.SetActive(false);
-        }
-        else
-        {
-            soundOff.SetActive(true);
-        }
-
-        audioManagerRef = FindObjectOfType<AudioManager>();
-    
+        SyncSprites();
         _isRules = false;
-        _isMusic = true;
-        _isSound = true;
         rulesPanel.SetActive(false);
         menuPanel.SetActive(false);
     }
 
+    void OnEnable()
+    {
+        SettingsManager.Instance.OnSettingChanged += OnSettingChanged;
+    }
+
+    void OnDisable()
+    {
+        SettingsManager.Instance.OnSettingChanged -= OnSettingChanged;
+    }
+
+    void OnSettingChanged(SettingType type, bool value)
+    {
+        if (type == SettingType.Music || type == SettingType.Sound || type == SettingType.Vibration)
+            SyncSprites();
+    }
+
+    void SyncSprites()
+    {
+        if (musicOff != null)
+            musicOff.SetActive(!SettingsManager.Instance.IsMusicEnabled);
+
+        if (soundOff != null)
+            soundOff.SetActive(!SettingsManager.Instance.IsSoundEnabled);
+
+        if (vibrationOff != null)
+            vibrationOff.SetActive(!SettingsManager.Instance.IsVibrationEnabled);
+    }
+
+    public void MenuBtn()
+    {
+        tapAudio.Play();
+        menuPanel.SetActive(!menuPanel.activeInHierarchy);
+    }
 
     public void GoHome()
     {
         tapAudio.Play();
-
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 
- 
     public void ToggleMusic()
     {
         tapAudio.Play();
-
-        if (PlayerPrefs.GetInt("isMusicOn") == 1)
-        {
-            musicOff.SetActive(true);
-        }
-        else
-        {
-            musicOff.SetActive(false);
-        }
-
-        audioManagerRef.Music();
-
+        SettingsManager.Instance.SetMusicEnabled(!SettingsManager.Instance.IsMusicEnabled);
+        if (audioManagerRef != null)
+            audioManagerRef.Music();
     }
+
     public void ToggleSound()
     {
         tapAudio.Play();
-
-        if (PlayerPrefs.GetInt("isSoundOn") == 1)
-        {
-            soundOff.SetActive(true);
-        }
-        else
-        {
-            soundOff.SetActive(false);
-        }
-        audioManagerRef.Sound();
-
+        SettingsManager.Instance.SetSoundEnabled(!SettingsManager.Instance.IsSoundEnabled);
+        if (audioManagerRef != null)
+            audioManagerRef.Sound();
     }
+
     public void ToggleVibration()
     {
         tapAudio.Play();
-
-        if (PlayerPrefs.GetInt("isVibrationOn") == 1)
-        {
-            vibrationOff.SetActive(true);
-        }
-        else
-        {
-            vibrationOff.SetActive(false);
-        }
-        audioManagerRef.HandleVibration();
-
+        SettingsManager.Instance.SetVibrationEnabled(!SettingsManager.Instance.IsVibrationEnabled);
     }
-
-    
 
     public void Rules()
     {
         tapAudio.Play();
-
-        if (_isRules)
-        {
-            rulesPanel.SetActive(false);
-
-        }
-        else
-        {
-            rulesPanel.SetActive(true);
-        }
         _isRules = !_isRules;
+        rulesPanel.SetActive(_isRules);
         menuPanel.SetActive(false);
     }
-
 }

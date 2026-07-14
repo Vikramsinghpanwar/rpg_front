@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Core.Utils;
 
 public class PeopleBet7UpDown : MonoBehaviour
 {

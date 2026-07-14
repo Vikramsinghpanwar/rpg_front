@@ -12,8 +12,7 @@ namespace Core.Managers
 
         int activeCount;
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        static void Bootstrap()
+        public static void EnsureInitialized()
         {
             if (Instance != null) return;
             var go = new GameObject("[LoadingManager]");

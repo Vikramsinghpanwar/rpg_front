@@ -7,6 +7,8 @@ using System;
 using Unity.Mathematics;
 using Core.Bootstrap;
 using Features.Lobby.Integration;
+using Core.Utils;
+using Core.Services;
 
 namespace Teenpatti
 {
@@ -32,6 +34,7 @@ namespace Teenpatti
 
         [Header("Player Data")]
         public string myId;
+        public string profileImageUrl;
         public string status;
         public int position;
         public bool isLocalPlayer = false;
@@ -84,13 +87,16 @@ namespace Teenpatti
         public void InvestAmount(float amount)
         {
             amountInvested += amount;
-            myAmountTxt.text = amountInvested.ToString("F2");
-            bidAmountTxt.text = amount.ToString("F2");
+            myAmountTxt.text = MoneyFormatter.FormatPaisa((long)(amountInvested * 100));
+            bidAmountTxt.text = MoneyFormatter.FormatPaisa((long)(amount * 100));
+
 
             if (isLocalPlayer && GameManager.Instance != null)
             {
-                Wallet.DeductAmount(amount);
-                GameManager.Instance.userWalletTxt.text = GameMode.mode == GameMode.Modes.privateGame ? (BootstrapService.Instance.Wallet.win_balance / 100f + BootstrapService.Instance.Wallet.deposit_balance / 100f).ToString("F2") : (BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f).ToString("F2");
+                long deduction = (long)(amount * 100);
+                BootstrapService.Instance.Wallet.available_balance -= deduction;
+                BootstrapService.Instance.Wallet.withdrawable_amount -= deduction;
+                GameManager.Instance.userWalletTxt.text = GameMode.mode == GameMode.Modes.privateGame ? MoneyFormatter.FormatPaisa((long)(BootstrapService.Instance.Wallet.available_balance - BootstrapService.Instance.Wallet.bonus_balance)) : MoneyFormatter.FormatPaisa(BootstrapService.Instance.Wallet.available_balance);
             }
         }
 
@@ -156,7 +162,7 @@ namespace Teenpatti
             InvestAmount(GameLiveData.instance.lastBetAmount);
             playerAnimator.SetTrigger("_chaal");
             ActionTaken();
-            bidAmountTxt.text = GameLiveData.instance.lastBetAmount.ToString("F2");
+            bidAmountTxt.text = MoneyFormatter.FormatPaisa((long)(GameLiveData.instance.lastBetAmount * 100));
         }
 
         public void ShowPOPUP(Sprite spr)
@@ -184,7 +190,7 @@ namespace Teenpatti
                 foreach (var p in GameLiveData.instance.playerDetailsArray)
                 {
                     if (p == null) continue;
-                    if (p.userId == BootstrapLobbyAdapter.GetUserId() && !p.isActive)
+                    if (p.publicId == BootstrapLobbyAdapter.GetUserId() && !p.isActive)
                     {
                         ActionButtons.instance.ImBack_Panel.SetActive(true);
                         break;
@@ -207,7 +213,7 @@ namespace Teenpatti
                 foreach (var p in GameLiveData.instance.playerDetailsArray)
                 {
                     if (p == null) continue;
-                    if (p.userId == BootstrapLobbyAdapter.GetUserId() && !p.isActive)
+                    if (p.publicId == BootstrapLobbyAdapter.GetUserId() && !p.isActive)
                     {
                         ActionButtons.instance.ImBack_Panel.SetActive(true);
                         break;
@@ -243,6 +249,7 @@ namespace Teenpatti
 
         public void AddMoneyToPool(float amount)
         {
+            Debug.Log($"Adding {amount} to pool for player {myId}");
             myAudioSouce.PlayOneShot(GameManager.Instance.addMoneyAC);
             InvestAmount(amount);
             playerAnimator.SetTrigger("_chaal");
@@ -319,16 +326,21 @@ namespace Teenpatti
             FillData(name, amount, null);
         }
 
+        public void StopTimer()
+        {
+            if (GameManager.Instance != null && GameManager.Instance.timerCoroutine != null)
+            {
+                GameManager.Instance.StopCoroutine(GameManager.Instance.timerCoroutine);
+            }
+            timerImg.fillAmount = 0;
+        }
+
         public void TimerStart(float timeRemaining = 30, float timeout = 30)
         {
             if (isLocalPlayer)
             {
                 myAudioSouce.PlayOneShot(GameManager.Instance.myTurnAC);
-#if UNITY_ANDROID || PLATFORM_ANDROID
-                if (PlayerPrefs.GetInt("isVibrationOn") == 1)
-                    Handheld.Vibrate();
-#endif
-
+                Core.Services.VibrationService.Vibrate();
             }
 
 
@@ -403,7 +415,7 @@ namespace Teenpatti
             if (type == 0)
             {
                 GameObject emoji = Instantiate(EmojiManager.instance.emojiPrefabs[value], transform.GetChild(1));
-                StartCoroutine(DestroyAfter(emoji, 2f));
+                Destroy(emoji, 2f);
             }
             else
             {
@@ -413,11 +425,6 @@ namespace Teenpatti
 
         }
 
-        IEnumerator DestroyAfter(GameObject obj, float time)
-        {
-            yield return new WaitForSeconds(time);
-            Destroy(obj);
-        }
         IEnumerator DeactivateAfter(GameObject obj, float time)
         {
             yield return new WaitForSeconds(time);
@@ -513,10 +520,9 @@ namespace Teenpatti
             }
         }
 
-        public void PopulateWithPlayer(int profile, string username)
+        public void PopulateWithPlayer(int profile, string username, string profileImageUrl = null)
         {
-            profileImg.sprite = GameManager.Instance.GetAvatarByIndex(profile);
-            profileImg.color = new Color(255f, 255f, 255f, 1f);
+            TeenPattiAvatarService.SetAvatar(this, profileImageUrl, myId);
             nameTxt.text = username;
         }
 
@@ -559,7 +565,7 @@ namespace Teenpatti
 
             // Restore player UI
             nameTxt.text = username;
-            myAmountTxt.text = chips.ToString();
+            myAmountTxt.text = MoneyFormatter.FormatPaisa((long)(chips * 100));
             myAmountTxt.gameObject.SetActive(true);
             bidAmountTxt.gameObject.SetActive(true);
             profileImg.color = Color.white;

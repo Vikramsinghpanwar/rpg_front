@@ -14,7 +14,7 @@ public class ConnectionCrash : MonoBehaviour
     private void Start()
     {
         csBankRef = FindAnyObjectByType<PlayerCrash>();
-        
+
     }
 
 
@@ -28,6 +28,6 @@ public class ConnectionCrash : MonoBehaviour
     public void Lobby()
     {
         BGM.Stop();
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 }

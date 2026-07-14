@@ -8,8 +8,12 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.Threading.Tasks;
+using Core.API;
 using Core.Config;
+using Core.Services;
 using Features.Lobby.Integration;
+using Core.Bootstrap;
 
 public class SocketManagerCarRoulette : MonoBehaviour
 {
@@ -20,6 +24,7 @@ public class SocketManagerCarRoulette : MonoBehaviour
     CarRoulleteManager manager;
     bool _isInitialFocus = true;
     public string currentRoundId;
+    bool _walletRefreshed;
 
     private void Awake()
     {
@@ -79,13 +84,13 @@ public class SocketManagerCarRoulette : MonoBehaviour
     void Start()
     {
 
-        var uri = new Uri(ServerConfig.SocketUrl + "/roundRoulette");
+        var uri = new Uri(ServerConfig.SocketUrl + "/carRoulette");
 
         socket = new SocketIOUnity(uri, new SocketIOOptions
         {
             Query = new Dictionary<string, string>
             {
-                {"token", "UNITY" }
+                {"token", TokenProvider.Instance?.AccessToken ?? string.Empty}
             },
             Transport = SocketIOClient.Transport.TransportProtocol.WebSocket
         });
@@ -243,6 +248,7 @@ public class SocketManagerCarRoulette : MonoBehaviour
 
     public void StartBetting(string response)
     {
+        _walletRefreshed = false;
 
         Debug.Log("my : " + response);
         JArray jsonArray = JArray.Parse(response);
@@ -320,43 +326,89 @@ public class SocketManagerCarRoulette : MonoBehaviour
     }
     public void Result(string response)
     {
-        JArray jsonArray = JArray.Parse(response);
+        Debug.Log("[CR] Result received");
+        try
+        {
+            JArray jsonArray = JArray.Parse(response);
+            Debug.Log("idhar : " + response);
+            JObject gameResult = (JObject)jsonArray[0];
+            JArray botWinA = (JArray)gameResult["botWinnerArray"];
+            int[] botWinArray = botWinA.ToObject<int[]>();
+            int winIndex = (int)gameResult["winIndex"];
 
-        Debug.Log("idhar : " + response);
-        // Assuming the first element in the array is the object you need
-        JObject gameResult = (JObject)jsonArray[0];
+            Debug.Log("[CR] Result animation starting");
+            manager.BeginResultProcessing();
+            manager.ShowResult(winIndex, botWinArray);
+            StartCoroutine(WaitForResultThenRefreshWallet());
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("Error parsing response: " + ex.Message);
+        }
+    }
 
-        JArray botWinA = (JArray)gameResult["botWinnerArray"];
+    private IEnumerator WaitForResultThenRefreshWallet()
+    {
+        yield return new WaitUntil(() => manager.IsResultAnimationComplete);
 
-        int[] botWinArray = botWinA.ToObject<int[]>();
+        Debug.Log("[CR] Result animation completed");
+        Debug.Log("[CR] RefreshWalletAsync starting");
 
-        // Parse the values from the JSON object
-        int winIndex = (int)gameResult["winIndex"];
-        manager.ShowResult(winIndex, botWinArray);
+        if (_walletRefreshed)
+        {
+            Debug.Log("[CR] Wallet refresh already performed this round, skipping duplicate");
+            yield break;
+        }
+        _walletRefreshed = true;
+
+        var refreshTask = CGSBetService.Instance.RefreshWalletAsync();
+
+        while (!refreshTask.IsCompleted)
+        {
+            yield return null;
+        }
+
+        if (refreshTask.IsFaulted)
+        {
+            Debug.LogWarning($"[CR] RefreshWalletAsync failed: {refreshTask.Exception?.Message}");
+        }
+        else
+        {
+            Debug.Log("[CR] RefreshWalletAsync completed");
+
+            var bs = Core.Bootstrap.BootstrapService.Instance;
+            if (bs != null && bs.Wallet != null && manager != null)
+            {
+                manager.UpdateWallet(bs.Wallet.available_balance);
+                Debug.Log($"[CR] Wallet UI updated from Bootstrap: {bs.Wallet.available_balance}");
+            }
+            else
+            {
+                Debug.LogWarning("[CR] Bootstrap wallet not available after refresh, cannot update game UI");
+            }
+        }
     }
 
     public void SendBetDataToServer(int betOn, float betAmount)
     {
-        Debug.Log("sending bet data : " + betOn + " bet amount : " + betAmount);
-        var data = new Dictionary<string, object>
-        {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-            { "betOn", betOn },
-            { "betAmount", betAmount }
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("sendData", jsonData);
+        _ = SendBetAsync(betOn, betAmount);
     }
+
+    async Task SendBetAsync(int betOn, float betAmount)
+    {
+        try
+        {
+            await CGSBetService.Instance.PlaceBetAsync(CGSGameKeys.RoundRoulette, betOn, (long)betAmount);
+        }
+        catch (ApiException ex)
+        {
+            Debug.LogWarning($"[SocketManagerCarRoulette] Bet rejected: {ex.StatusCode} {ex.Message}");
+        }
+    }
+
     public void ClearlAllBets()
     {
-        var data = new Dictionary<string, object>
-        {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("clearAllBet", jsonData);
+        // Bets are HTTP-authoritative — no socket emit needed for clear
     }
 
     public void SendGameStatusRequest()

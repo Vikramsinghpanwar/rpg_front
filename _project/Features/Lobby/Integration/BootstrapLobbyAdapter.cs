@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using UnityEngine;
 using Features.Lobby.Models;
 using Core.Bootstrap;
+using Core.API;
+using Core.API.Endpoints;
 
 namespace Features.Lobby.Integration
 {
@@ -28,34 +30,19 @@ namespace Features.Lobby.Integration
             {
                 SyncToLegacy(bootstrap);
             }
+            _ = Core.Bootstrap.BootstrapService.Instance.HydrateReferralCodeIfMissing();
         }
 
         void SyncToLegacy(Core.Models.BootstrapResponse bootstrap)
         {
-            // Sync profile data
-            if (bootstrap?.profile != null)
-            {
-                var p = bootstrap.profile;
-                // UserDetail fields would be set here if needed for legacy compatibility
-                // BootstrapLobbyAdapter.GetUserId() = p.id;
-                // UserDetail.UserName = p.username;
-                // Note: Mobile, Email, etc. are not in BootstrapProfile - would need to be added
-            }
-
-            // Sync wallet data
-            if (bootstrap?.wallet != null)
-            {
-                var w = bootstrap.wallet;
-                // Legacy compatibility - convert from paisa to rupees float
-                // Games.Common.Scripts.Wallet.SetDepositWallet(w.deposit_balance / 100f);
-                // Games.Common.Scripts.Wallet.SetWinWallet(w.win_balance / 100f);
-                // Games.Common.Scripts.Wallet.SetBonus(w.bonus_balance / 100f);
-            }
+            // Legacy sync hubbed through BootstrapService only.
+            // Direct writes to Assets/Lobby user classes are kept out of _project to avoid
+            // tight coupling; legacy screens that still need UserDetail should be migrated.
         }
 
         public static long GetWalletBalanceTotal()
         {
-            return (BootstrapService.Instance?.Wallet?.deposit_balance ?? 0) + (BootstrapService.Instance?.Wallet?.win_balance ?? 0);
+            return (BootstrapService.Instance?.Wallet?.available_balance ?? 0) - (BootstrapService.Instance?.Wallet?.locked_balance ?? 0);
         }
 
         public static long GetBonusBalance()

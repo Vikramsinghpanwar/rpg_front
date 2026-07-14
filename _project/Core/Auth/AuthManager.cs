@@ -23,15 +23,17 @@ namespace Core.Auth
         public AuthState CurrentState { get; private set; } = AuthState.Uninitialized;
         public AuthMe CurrentUser { get; private set; }
         public bool IsAuthenticated => CurrentState == AuthState.Authenticated;
+        public string PendingPromoCode { get; set; }
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        static void Bootstrap()
+        public static void EnsureInitialized()
         {
-            if (Instance != null) return;
-            var go = new GameObject("[AuthManager]");
-            DontDestroyOnLoad(go);
-            Instance = go.AddComponent<AuthManager>();
-            Instance.WireTokenProviderEvents();
+            if (Instance == null)
+            {
+                var go = new GameObject("[AuthManager]");
+                DontDestroyOnLoad(go);
+                Instance = go.AddComponent<AuthManager>();
+                Instance.WireTokenProviderEvents();
+            }
         }
 
         void WireTokenProviderEvents()
@@ -94,7 +96,7 @@ namespace Core.Auth
 
         public async Task<PlayerLoginResponse> VerifyOtp(string challengeId, string code)
         {
-            var response = await AuthService.VerifyOtp(challengeId, code);
+            var response = await AuthService.VerifyOtp(challengeId, code, promoCode: PendingPromoCode);
             ApplyLogin(response);
             return response;
         }
@@ -102,7 +104,7 @@ namespace Core.Auth
         // ── Google flow ────────────────────────────────────────────────────────
         public async Task<PlayerLoginResponse> LoginWithGoogle(string idToken)
         {
-            var response = await AuthService.LoginWithGoogle(idToken);
+            var response = await AuthService.LoginWithGoogle(idToken, promoCode: PendingPromoCode);
             ApplyLogin(response);
             return response;
         }
@@ -131,7 +133,7 @@ namespace Core.Auth
         {
             CurrentUser = null;
             SetState(AuthState.SessionExpired);
-            // SessionExpired → Unauthenticated so the login screen can take over.
+            Toast.Instance.ShowError("Session expired. Please log in again.");
             SetState(AuthState.Unauthenticated);
         }
 
@@ -146,12 +148,13 @@ namespace Core.Auth
                 response.AccessToken,
                 response.RefreshToken,
                 response.ExpiresIn);
-            // Build a minimal AuthMe from the login response so the UI has a user without a roundtrip.
             CurrentUser = new AuthMe
             {
                 Sub = response.User?.Id,
                 Email = response.User?.Email
             };
+            // Build a minimal AuthMe from the login response so the UI has a user without a roundtrip.
+            PendingPromoCode = null;
             SetState(AuthState.Authenticated);
         }
 

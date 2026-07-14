@@ -7,6 +7,8 @@ using System.Runtime.InteropServices;
 using UnityEngine.SceneManagement;
 using System.Security.Cryptography;
 using System.Text;
+using Core.Bootstrap;
+using Core.Utils;
 
 public class ManagerBRoullete : MonoBehaviour
 {
@@ -116,8 +118,8 @@ public class ManagerBRoullete : MonoBehaviour
     #endregion
     void Start()
     {
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
+
 
         socketRef = FindObjectOfType<SocketManagerBoxRoulette>();
         countDownRef = FindObjectOfType<CountDown321>();
@@ -129,7 +131,6 @@ public class ManagerBRoullete : MonoBehaviour
         tileScript = FindObjectOfType<TileGlowControllerBoxRoullete>();
         stopBetPanel.SetActive(false);
         startBetPanel.SetActive(false);
-        apisRef.FetchWallet();
 
     }
 
@@ -327,17 +328,17 @@ public class ManagerBRoullete : MonoBehaviour
             int t = (randomValue10 * 50);
             int u = (randomValue11 * 50);
 
-            betOn1Text.text = $"<color=yellow>{bet1BetVal}</color><color=#02ccfe>/{k}</color>";
-            betOn2Text.text = $"<color=yellow>{bet2BetVal}</color><color=#02ccfe>/{l}</color>";
-            betOn3Text.text = $"<color=yellow>{bet3BetVal}</color><color=#02ccfe>/{m}</color>";
-            betOn4Text.text = $"<color=yellow>{bet4BetVal}</color><color=#02ccfe>/{n}</color>";
-            betOn5Text.text = $"<color=yellow>{bet5BetVal}</color><color=#02ccfe>/{o}</color>";
-            betOn6Text.text = $"<color=yellow>{bet6BetVal}</color><color=#02ccfe>/{p}</color>";
-            betOn7Text.text = $"<color=yellow>{bet7BetVal}</color><color=#02ccfe>/{q}</color>";
-            betOn8Text.text = $"<color=yellow>{bet8BetVal}</color><color=#02ccfe>/{r}</color>";
-            betOn9Text.text = $"<color=yellow>{bet9BetVal}</color><color=#02ccfe>/{s}</color>";
-            betOn10Text.text = $"<color=yellow>{bet10BetVal}</color><color=#02ccfe>/{t}</color>";
-            betOn11Text.text = $"<color=yellow>{bet11BetVal}</color><color=#02ccfe>/{u}</color>";
+            betOn1Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)bet1BetVal)}</color><color=#02ccfe>/{k}</color>";
+            betOn2Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)bet2BetVal)}</color><color=#02ccfe>/{l}</color>";
+            betOn3Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)bet3BetVal)}</color><color=#02ccfe>/{m}</color>";
+            betOn4Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)bet4BetVal)}</color><color=#02ccfe>/{n}</color>";
+            betOn5Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)bet5BetVal)}</color><color=#02ccfe>/{o}</color>";
+            betOn6Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)bet6BetVal)}</color><color=#02ccfe>/{p}</color>";
+            betOn7Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)bet7BetVal)}</color><color=#02ccfe>/{q}</color>";
+            betOn8Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)bet8BetVal)}</color><color=#02ccfe>/{r}</color>";
+            betOn9Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)bet9BetVal)}</color><color=#02ccfe>/{s}</color>";
+            betOn10Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)bet10BetVal)}</color><color=#02ccfe>/{t}</color>";
+            betOn11Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)bet11BetVal)}</color><color=#02ccfe>/{u}</color>";
             jackpotText.text = "₹ " + (k + l + m + n + o + p + q + r + s + t + u);
             yield return new WaitForSeconds(updateInterval);
         }
@@ -353,11 +354,11 @@ public class ManagerBRoullete : MonoBehaviour
 
         betRoda.SetActive(false);
         Coroutine betAmountCoroutineRef = StartCoroutine(BetAmountIncrease());
-        
+
 
         StartCoroutine(burstManager.AnimStart());
         startBetPanel.SetActive(true);
-        StartCoroutine(tileScript.CountDown(remTime -2));
+        StartCoroutine(tileScript.CountDown(remTime - 2));
 
         yield return new WaitForSeconds(1f);
         startBetPanel.SetActive(false);
@@ -379,7 +380,7 @@ public class ManagerBRoullete : MonoBehaviour
         StopCoroutine(betAmountCoroutineRef);
         yield return new WaitForSeconds(1);
         stopBetPanel.SetActive(false);
-        
+
     }
 
     IEnumerator ShowResultEnum(int val, int randVal)
@@ -391,11 +392,11 @@ public class ManagerBRoullete : MonoBehaviour
     public IEnumerator WinnerDeclare(int index)
     {
         //resutl show wala panel;
-       
+
         yield return new WaitForSeconds(2);
         winnerAudio.Play();
         winnerImgDisplayer.SetActive(true);
-     
+
 
         Transform childTransform = tileScript.tiles[index].transform.GetChild(0);
         string winner = "";
@@ -424,7 +425,7 @@ public class ManagerBRoullete : MonoBehaviour
             }
 
             burstManager.Winnerr(0);
-   
+
         }
 
 
@@ -464,7 +465,7 @@ public class ManagerBRoullete : MonoBehaviour
                 winAmnt += bet3BetVal * 5;
             }
             burstManager.Winnerr(2);
-  
+
         }
 
         if (winner == "four")
@@ -485,7 +486,7 @@ public class ManagerBRoullete : MonoBehaviour
             }
 
             burstManager.Winnerr(3);
-      
+
         }
 
 
@@ -508,7 +509,7 @@ public class ManagerBRoullete : MonoBehaviour
             }
 
             burstManager.Winnerr(4);
-     
+
         }
 
         if (winner == "six")
@@ -529,7 +530,7 @@ public class ManagerBRoullete : MonoBehaviour
             }
 
             burstManager.Winnerr(5);
-        
+
         }
 
 
@@ -552,7 +553,7 @@ public class ManagerBRoullete : MonoBehaviour
             }
 
             burstManager.Winnerr(6);
-   
+
         }
 
         if (winner == "eight")
@@ -574,7 +575,7 @@ public class ManagerBRoullete : MonoBehaviour
 
             burstManager.Winnerr(7);
             burstManager.Winnerr(7);
-          
+
         }
         if (winner == "one" || winner == "two" || winner == "three" || winner == "four")
         {
@@ -588,7 +589,7 @@ public class ManagerBRoullete : MonoBehaviour
                 winAmnt += bet10BetVal * 2;
             }
 
-            
+
         }
 
         if (winner == "five" || winner == "six" || winner == "seven" || winner == "eight")
@@ -606,7 +607,7 @@ public class ManagerBRoullete : MonoBehaviour
 
         }
 
-      
+
 
 
         else if (winner == "100X")
@@ -615,7 +616,7 @@ public class ManagerBRoullete : MonoBehaviour
             yield return new WaitForSeconds(2f);
             winnerImgDisplayer.SetActive(false);
         }
-        
+
         else if (winner == "24X")
         {
             winnerImgDisplayerImage.sprite = items[9];
@@ -623,14 +624,14 @@ public class ManagerBRoullete : MonoBehaviour
             winnerImgDisplayer.SetActive(false);
         }
 
-         else if (winner == "PayAll")
+        else if (winner == "PayAll")
         {
             winnerImgDisplayerImage.sprite = items[10];
             yield return new WaitForSeconds(2f);
             winnerImgDisplayer.SetActive(false);
         }
 
-         else if (winner == "TakeAll")
+        else if (winner == "TakeAll")
         {
             historyRef.AddHistory(8);
 
@@ -640,7 +641,7 @@ public class ManagerBRoullete : MonoBehaviour
         }
 
         yield return new WaitForSeconds(2f);
-      
+
         if (winAmnt > 0)
         {
             winPanel.SetActive(true);
@@ -673,12 +674,12 @@ public class ManagerBRoullete : MonoBehaviour
         target9A.SetBool("isWinner", false);
         target10A.SetBool("isWinner", false);
         target11A.SetBool("isWinner", false);
- 
+
         yield return new WaitForSeconds(1);
         tileScript.tiles[index].color = new Color(1, 1, 1, 0);
 
 
-       
+
 
         winnerImgDisplayerImage.sprite = null;
     }
@@ -687,12 +688,12 @@ public class ManagerBRoullete : MonoBehaviour
 
     public void Bet(int val)
     {
-        if(walletAmount < 50)
+        if (walletAmount < 50)
         {
             insufficientFundsPanel.SetActive(true);
             return;
         }
-        int amount = betManagerRef.betVal;
+        int amount = betManagerRef.betVal * 100;
         if (walletAmount < amount)
         {
             insufficientFundsObj.SetActive(true);

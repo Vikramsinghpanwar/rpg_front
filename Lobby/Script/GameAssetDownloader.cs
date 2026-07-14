@@ -9,6 +9,7 @@ using Core.Config;
 
 public class GameAssetDownloader : MonoBehaviour
 {
+    public static GameAssetDownloader Instance { get; private set; }
     public int imagesDownloaded = 0;
     public int totalImagesToDownload = 0;
     int totalGamesDownloaded = 0;
@@ -19,8 +20,21 @@ public class GameAssetDownloader : MonoBehaviour
 
     private float targetProgress = 0f;  // Target progress value for smooth animation
 
+    private void Awake()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
     private void Start()
     {
+        Debug.Log("Persistent Data Path: " + Application.persistentDataPath);
         foreach (ImageData i in gameData)
         {
             totalImagesToDownload += i.name.Length;
@@ -62,17 +76,18 @@ public class GameAssetDownloader : MonoBehaviour
             if (File.Exists(path))
             {
                 imagesDownloaded++;
-                UpdateProgress(imagesDownloaded,  1);
+                UpdateProgress(imagesDownloaded, 1);
                 continue;
             }
             string imgUrl = ServerConfig.Downloadable_Assets_Url + imgData.path + imgData.name[i];
+            Debug.Log("Downloading image from: " + imgUrl);
             using (UnityWebRequest www = UnityWebRequestTexture.GetTexture(imgUrl))
             {
                 www.SendWebRequest();
 
                 while (!www.isDone)
                 {
-                    UpdateProgress(imagesDownloaded,  www.downloadProgress);
+                    UpdateProgress(imagesDownloaded, www.downloadProgress);
                     yield return null; // Wait for the next frame to update
                 }
 
@@ -95,9 +110,9 @@ public class GameAssetDownloader : MonoBehaviour
     private void UpdateProgress(int imagesDownloaded, float currentDownloadProgress)
     {
         float overallProgress = ((float)imagesDownloaded + currentDownloadProgress) / totalImagesToDownload;
-        
+
         overallProgress = Mathf.Clamp01(overallProgress);
-        
+
         targetProgress = overallProgress; // Set the target for smooth animation
 
 

@@ -5,9 +5,13 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SocketIOClient.Newtonsoft.Json;
+using System.Threading.Tasks;
 using UnityEngine.SceneManagement;
+using Core.API;
 using Core.Config;
+using Core.Services;
 using Features.Lobby.Integration;
+using System.Collections;
 
 [DisallowMultipleComponent]
 public class SocketManagerDT : MonoBehaviour
@@ -73,6 +77,8 @@ public class SocketManagerDT : MonoBehaviour
         }
     }
 
+    bool _walletRefreshed;
+
     void Start()
     {
         var uri = new Uri(ServerConfig.SocketUrl + "/dragonTiger");
@@ -80,7 +86,7 @@ public class SocketManagerDT : MonoBehaviour
         {
             Query = new Dictionary<string, string>
             {
-                {"token", "UNITY" }
+                {"token", TokenProvider.Instance?.AccessToken ?? string.Empty}
             },
             Transport = SocketIOClient.Transport.TransportProtocol.WebSocket
         });
@@ -226,6 +232,7 @@ public class SocketManagerDT : MonoBehaviour
 
     public void StartBetting(string response)
     {
+        _walletRefreshed = false;
         Debug.Log("start Betting : " + response);
         JArray jsonArray = JArray.Parse(response);
 
@@ -274,7 +281,7 @@ public class SocketManagerDT : MonoBehaviour
 
     public void Result(SocketIOResponse response)
     {
-        Debug.Log("result : " + response);
+        Debug.Log("[DT] Result received");
         try
         {
             JArray jsonResponseArray = JArray.Parse(response.ToString());
@@ -289,11 +296,56 @@ public class SocketManagerDT : MonoBehaviour
             string tigerCard = tCard.ToObject<string>();
             Char Winner = winner.ToObject<Char>();
 
+            Debug.Log("[DT] Result animation starting");
+            manager.BeginResultProcessing();
             manager.DisplayCards(dragonCard, tigerCard, Winner, botWinArray);
+            StartCoroutine(WaitForResultThenRefreshWallet());
         }
         catch (Exception ex)
         {
             Debug.LogError("Error parsing response: " + ex.Message);
+        }
+    }
+
+    private IEnumerator WaitForResultThenRefreshWallet()
+    {
+        yield return new WaitUntil(() => manager.IsResultAnimationComplete);
+
+        Debug.Log("[DT] Result animation completed");
+        Debug.Log("[DT] RefreshWalletAsync starting");
+
+        if (_walletRefreshed)
+        {
+            Debug.Log("[DT] Wallet refresh already performed this round, skipping duplicate");
+            yield break;
+        }
+        _walletRefreshed = true;
+
+        var refreshTask = CGSBetService.Instance.RefreshWalletAsync();
+
+        while (!refreshTask.IsCompleted)
+        {
+            yield return null;
+        }
+
+        if (refreshTask.IsFaulted)
+        {
+            Debug.LogWarning($"[DT] RefreshWalletAsync failed: {refreshTask.Exception?.Message}");
+        }
+        else
+        {
+            Debug.Log("[DT] RefreshWalletAsync completed");
+
+            var bs = Core.Bootstrap.BootstrapService.Instance;
+            if (bs != null && bs.Wallet != null && manager != null)
+            {
+                manager.UpdateWallet(bs.Wallet.available_balance);
+                Debug.Log($"[DT] Wallet UI updated from Bootstrap: {bs.Wallet.available_balance}");
+            }
+            else
+            {
+                Debug.LogWarning("[DT] Bootstrap wallet not available after refresh, cannot update game UI");
+            }
         }
     }
 
@@ -320,26 +372,21 @@ public class SocketManagerDT : MonoBehaviour
     }
     public void SendBetDataToServer(int betOn, float betAmount)
     {
-        var data = new Dictionary<string, object>
-        {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-            { "betOn", betOn },
-            { "betAmount", betAmount }
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("sendData", jsonData);
+        _ = SendBetAsync(betOn, betAmount);
     }
-    public void ClearAllBets()
+
+    async Task SendBetAsync(int betOn, float betAmount)
     {
-        var data = new Dictionary<string, object>
+        try
         {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("clearAllBet", jsonData);
+            await CGSBetService.Instance.PlaceBetAsync(CGSGameKeys.DragonTiger, betOn, (long)betAmount);
+        }
+        catch (ApiException ex)
+        {
+            Debug.LogWarning($"[SocketManagerDT] Bet rejected: {ex.StatusCode} {ex.Message}");
+        }
     }
+
 
     GameObject currentlyOpenPanel;
 

@@ -2,8 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
-using Teenpatti;
-using Teenpatti;
 using System.Linq;
 using Features.Lobby.Integration;
 public class CardsDeal : MonoBehaviour
@@ -32,7 +30,7 @@ public class CardsDeal : MonoBehaviour
         {
             if (playerDetailArray[i] == null) continue;
             if (playerDetailArray[i].id == "") continue;
-            if (playerDetailArray[i].userId == BootstrapLobbyAdapter.GetUserId())
+            if (playerDetailArray[i].publicId == BootstrapLobbyAdapter.GetUserId())
             {
                 pivotIndex = i;
                 break;

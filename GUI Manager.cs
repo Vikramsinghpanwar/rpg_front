@@ -4,17 +4,17 @@ using UnityEngine;
 
 public class GUIManager : MonoBehaviour
 {
-        public InGameRecharge inGameRechargeRef;
+    public InGameRecharge inGameRechargeRef;
 
 
-        private void Start()
+    private void Start()
     {
         inGameRechargeRef = FindFirstObjectByType<InGameRecharge>();
         Application.targetFrameRate = 200;
     }
-   public void Lobby()
+    public void Lobby()
     {
-        UnityEngine.SceneManagement.SceneManager.LoadScene(1);
+        UnityEngine.SceneManagement.SceneManager.LoadScene("Lobby");
     }
 
     public void AddCash()

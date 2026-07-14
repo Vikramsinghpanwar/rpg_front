@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 
 public class OptionsBac : MonoBehaviour
 {
-     
+
 
     public AudioSource bgmMusicPlayer;
 
@@ -117,7 +117,7 @@ public class OptionsBac : MonoBehaviour
 
     public void Lobby()
     {
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
         bgmMusicPlayer.Stop();
         Application.Quit();
 

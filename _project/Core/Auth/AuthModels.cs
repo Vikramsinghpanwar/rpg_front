@@ -46,6 +46,7 @@ namespace Core.Auth
         [JsonProperty("code")] public string Code;
         [JsonProperty("platform")] public string Platform;
         [JsonProperty("device")] public DeviceInfo Device;
+        [JsonProperty("promo_code", NullValueHandling = NullValueHandling.Ignore)] public string PromoCode;
     }
 
     [Serializable]
@@ -66,6 +67,7 @@ namespace Core.Auth
         [JsonProperty("id_token")] public string IdToken;
         [JsonProperty("platform")] public string Platform;
         [JsonProperty("device")] public DeviceInfo Device;
+        [JsonProperty("promo_code", NullValueHandling = NullValueHandling.Ignore)] public string PromoCode;
     }
 
     // ── Login response (shared by OTP verify + Google) ─────────────────────────

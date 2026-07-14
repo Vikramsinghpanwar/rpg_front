@@ -11,7 +11,7 @@ public class CarRoulleteConnection : MonoBehaviour
     public void Lobby()
     {
         BGM.Stop();
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 
 

@@ -176,8 +176,7 @@ public class Logger : MonoBehaviour
 
     // ──────────────── AUTO INIT ─────────────────────────────────
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-    static void Init()
+    public static void EnsureInitialized()
     {
         if (Instance == null)
         {

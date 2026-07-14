@@ -7,6 +7,7 @@ using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 using TMPro;
 using Core.Config;
+using Core.Utils;
 
 public class Api : MonoBehaviour
 {
@@ -83,7 +84,7 @@ public class Api : MonoBehaviour
                 BettingClass[] BettingData = JsonHelper.FromJson<BettingClass>(jsonResponse);
                 if (BettingData[0].status == 1)
                 {
-                    UserWalletShow.text = "₹" + BettingData[0].wallet.ToString();
+                    UserWalletShow.text = MoneyFormatter.FormatPaisa((long)(BettingData[0].wallet * 100));
                     //UserWalletShow.text = (BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f).ToString("F2");
                     OpenErrorPanel(BettingData[0].message);
                     OpenBett be = FindObjectOfType<OpenBett>();

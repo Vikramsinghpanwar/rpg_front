@@ -176,7 +176,7 @@ namespace Game.ChickenRoad
 
         public void Lobby()
         {
-            SceneManager.LoadScene(1);
+            SceneManager.LoadScene("Lobby");
         }
         void ResetGame()
         {

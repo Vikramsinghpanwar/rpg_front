@@ -3,6 +3,8 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.SceneManagement;
 using Features.Lobby.Integration;
+using Core.Utils;
+using Core.Bootstrap;
 
 public class ManagerSlot : MonoBehaviour
 {
@@ -14,17 +16,17 @@ public class ManagerSlot : MonoBehaviour
 
     private void Start()
     {
-        wallet = BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f;
-        walletText.text = wallet.ToString("F2");
+        wallet = (BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
+        walletText.text = MoneyFormatter.FormatPaisa((long)(wallet * 100));
         jugadRef = FindObjectOfType<Jugad>();
     }
     public void WalletUpdate(float val)
     {
 
         wallet += val;
-        walletText.text = wallet.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)(wallet * 100));
         Wallet.AddToWinWallet(val);
-        walletText.text = (BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f).ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)(wallet * 100));
 
     }
 
@@ -32,16 +34,16 @@ public class ManagerSlot : MonoBehaviour
     {
         wallet -= val;
         Wallet.DeductAmount(val);
-        walletText.text = (BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f).ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)(wallet * 100));
     }
     public void Lobby()
     {
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 
     public void AddCash()
     {
         PlayerPrefs.SetInt("_addCash", 1);
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 }

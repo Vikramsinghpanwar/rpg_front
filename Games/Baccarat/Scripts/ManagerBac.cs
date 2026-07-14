@@ -10,6 +10,8 @@ using System.Text;
 using System.Security.Cryptography;
 using DG.Tweening;
 using Features.Lobby.Integration;
+using Core.Utils;
+using Core.Bootstrap;
 
 
 public class ManagerBac : MonoBehaviour
@@ -65,6 +67,7 @@ public class ManagerBac : MonoBehaviour
     public Text timer_text;
     public Text walletText;
     public float walletAmount;
+    private bool _resultAnimationComplete;
     public Sprite cardImg;
     public int p1po, p2po;
     public Image p1i1, p1i2, p1i3, p2i1, p2i2, p2i3;
@@ -78,7 +81,6 @@ public class ManagerBac : MonoBehaviour
     // Start is called before the first frame update
     TableBotManager botManagerRef;
     public int[] botsWinArray;
-    APIs apisRef;
     string gamePhase = "";
 
 
@@ -86,7 +88,7 @@ public class ManagerBac : MonoBehaviour
     public AudioClip placeYourBets_Clip;
 
     public AudioSource effect_AudioSource;
-    
+
     public void Restart()
     {
         SceneManager.LoadScene("Game");
@@ -94,7 +96,7 @@ public class ManagerBac : MonoBehaviour
 
     public void Lobby()
     {
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 
 
@@ -117,8 +119,6 @@ public class ManagerBac : MonoBehaviour
     private void Start()
     {
         botsWinArray = new int[] { 0, 0, 0, 0, 0, 0 };
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
 
         botManagerRef = FindObjectOfType<TableBotManager>();
         socketRef = FindObjectOfType<SocketManagerBac>();
@@ -126,17 +126,22 @@ public class ManagerBac : MonoBehaviour
         winPanel.SetActive(false);
         betManagerRef = FindObjectOfType<BetManagerBac>();
         betRoda.SetActive(true);
-        walletAmount = BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f;
-        walletText.text = "₹" + walletAmount.ToString("F2");
-        apisRef.FetchWallet();
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
 
     }
 
-    private void UpdateWallet(float wAmount)
+    public void UpdateWallet(long wAmount)
     {
         walletAmount = wAmount;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa(wAmount);
     }
+
+    public void BeginResultProcessing()
+    {
+        _resultAnimationComplete = false;
+    }
+
+    public bool IsResultAnimationComplete => _resultAnimationComplete;
 
     public void LoadDeck()
     {
@@ -200,9 +205,9 @@ public class ManagerBac : MonoBehaviour
     }
 
 
-    public void DisplayCards(List<string> playerCards, List<string> dealerCards, char winner,int playerPair, int bankerPair, int[] botWinArray)
+    public void DisplayCards(List<string> playerCards, List<string> dealerCards, char winner, int playerPair, int bankerPair, int[] botWinArray)
     {
-        for(int i = 0; i<6; i++)
+        for (int i = 0; i < 6; i++)
         {
             botsWinArray[i] = botWinArray[i];
         }
@@ -210,11 +215,11 @@ public class ManagerBac : MonoBehaviour
 
         gamePhase = "Result";
         botsWinArray = new int[6];
-        for(int i = 0; i< botWinArray.Length; i++)
+        for (int i = 0; i < botWinArray.Length; i++)
         {
             botsWinArray[i] = botWinArray[i];
         }
-        if(p1CardList == null)
+        if (p1CardList == null)
         {
             p1CardList = new List<Sprite>();
         }
@@ -228,7 +233,7 @@ public class ManagerBac : MonoBehaviour
         {
             p1CardList.Add(GetSpriteByName(playerCards[i]));
         }
-        
+
         for (int i = 0; i < dealerCards.Count; i++)
         {
             p2CardList.Add(GetSpriteByName(dealerCards[i]));
@@ -307,9 +312,9 @@ public class ManagerBac : MonoBehaviour
         p2i1.sprite = cardImg;
         p2i2.sprite = cardImg;
         p2i3.sprite = cardImg;
-       
-      
-        StartCoroutine(StartTimer(val -3f));
+
+
+        StartCoroutine(StartTimer(val - 3f));
     }
 
 
@@ -340,7 +345,7 @@ public class ManagerBac : MonoBehaviour
         yield return new WaitForSeconds(1);
         betStopsPanel.SetActive(false);
         int k = betAmntTie + betAmountBanker + betAmountBankerPair + betAmountPlayer + betAmountPlayerPair;
-  
+
     }
 
 
@@ -364,7 +369,7 @@ public class ManagerBac : MonoBehaviour
         random3 = new System.Random(GenerateConsistentHash(seeds[2]));
         random4 = new System.Random(GenerateConsistentHash(seeds[3]));
         random5 = new System.Random(GenerateConsistentHash(seeds[4]));
- 
+
 
 
         Debug.Log("111111111111111111" + random1.Next());
@@ -381,7 +386,7 @@ public class ManagerBac : MonoBehaviour
                 randomValue3 += random3.Next(1, 10);
                 randomValue4 += random4.Next(1, 10);
                 randomValue5 += random5.Next(1, 10);
-     
+
 
             }
 
@@ -431,11 +436,11 @@ public class ManagerBac : MonoBehaviour
             int n = (randomValue4 * 40);
             int o = (randomValue5 * 770);
 
-            randomBetText1.text = $"<color=yellow>{betAmountBankerPair}</color><color=#02ccfe>/{k}</color>";
-            randomBetText2.text = $"<color=yellow>{betAmountPlayerPair}</color><color=#02ccfe>/{l}</color>";
-            randomBetText3.text = $"<color=yellow>{betAmountPlayer}</color><color=#02ccfe>/{m}</color>";
-            randomBetText4.text = $"<color=yellow>{betAmntTie}</color><color=#02ccfe>/{n}</color>";
-            randomBetText5.text = $"<color=yellow>{betAmountBanker}</color><color=#02ccfe>/{o}</color>";
+            randomBetText1.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmountBankerPair)}</color><color=#02ccfe>/{k}</color>";
+            randomBetText2.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmountPlayerPair)}</color><color=#02ccfe>/{l}</color>";
+            randomBetText3.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmountPlayer)}</color><color=#02ccfe>/{m}</color>";
+            randomBetText4.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmntTie)}</color><color=#02ccfe>/{n}</color>";
+            randomBetText5.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmountBanker)}</color><color=#02ccfe>/{o}</color>";
 
             yield return new WaitForSeconds(updateInterval);
         }
@@ -466,11 +471,11 @@ public class ManagerBac : MonoBehaviour
 
     public void ClearAllBets()
     {
-                if(gamePhase != "Betting")return;
+        if (gamePhase != "Betting") return;
 
-        if (betAmntTie <= 0 && betAmountBanker <= 0 && betAmountBankerPair <=0 && betAmountPlayer <= 0 && betAmountPlayerPair <= 0) return;
+        if (betAmntTie <= 0 && betAmountBanker <= 0 && betAmountBankerPair <= 0 && betAmountPlayer <= 0 && betAmountPlayerPair <= 0) return;
         walletAmount += betAmountBankerPair + betAmntTie + betAmountBankerPair + betAmountPlayer + betAmountPlayerPair;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount));
 
         betAmountBanker = betAmountBankerPair = betAmntTie = betAmountPlayer = betAmountPlayerPair = 0;
         socketRef.ClearAllBets();
@@ -482,18 +487,18 @@ public class ManagerBac : MonoBehaviour
     Vector3 recentTouchPos;
     void Awake()
     {
-        if(Instance != this)
+        if (Instance != this)
         {
             Instance = this;
         }
-    }    
+    }
     public void RegisterTouch(Vector3 touch)
     {
         recentTouchPos = touch;
     }
     void ClearMyCoins()
     {
-        foreach(GameObject g in myCoinsList)
+        foreach (GameObject g in myCoinsList)
         {
             Destroy(g);
         }
@@ -501,53 +506,53 @@ public class ManagerBac : MonoBehaviour
     }
 
     void InstantiateCoin()
-    {        
+    {
         GameObject coin = Instantiate(TableBotManager.Instance.coinPrefabList[betManagerRef.betChipNum - 1], myCoinHolder);
         coin.transform.localScale = Vector3.one;
         coin.transform.position = recentTouchPos;
         myCoinsList.Add(coin);
         coin.transform.SetParent(myCoinHolder);
     }
-         
+
 
     public void Bet(int betOn)
     {
-        if(gamePhase != "Betting")
+        if (gamePhase != "Betting")
         {
             return;
         }
-        int val = betManagerRef.betVal;
+        int val = betManagerRef.betVal * 100;
 
         betNumber = 0;
         if (val <= walletAmount)
         {
             coinSound.Play();
             walletAmount -= val;
-            walletText.text = "₹" + walletAmount.ToString("F2");
+            walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
             InstantiateCoin();
 
             switch (betOn)
             {
                 case 1:
                     betAmountBankerPair += val;
-                  
+
                     break;
                 case 3:
                     betAmntTie += val;
-                   
+
 
                     break;
                 case 2:
                     betAmountPlayerPair += val;
-                    
+
                     break;
                 case 4:
                     betAmountPlayer += val;
-                   
+
                     break;
                 case 5:
                     betAmountBanker += val;
-                   
+
 
                     break;
             }
@@ -560,69 +565,69 @@ public class ManagerBac : MonoBehaviour
 
 
 
-public IEnumerator ShowCards(int playerPair, int bankerPair)
-{
-    yield return new WaitForSeconds(0.5f);
-
-    // ===== PLAYER CARD 1 =====
-    yield return DealAndFlip(p1i1, p1CardList[0], p1Slot1);
-
-    playerSum += GetCardValue(p1CardList[0].name.Substring(1));
-    playerSumText.text = playerSum.ToString();
-
-    yield return new WaitForSeconds(0.4f);
-
-    // ===== BANKER CARD 1 =====
-    yield return DealAndFlip(p2i1, p2CardList[0], p2Slot1);
-
-    bankerSum += GetCardValue(p2CardList[0].name.Substring(1));
-    bankerSumText.text = bankerSum.ToString();
-
-    yield return new WaitForSeconds(0.4f);
-
-    // ===== PLAYER CARD 2 =====
-    yield return DealAndFlip(p1i2, p1CardList[1], p1Slot2);
-
-    playerSum += GetCardValue(p1CardList[1].name.Substring(1));
-    if (playerSum >= 10) playerSum -= 10;
-    playerSumText.text = playerSum.ToString();
-
-    yield return new WaitForSeconds(0.4f);
-
-    // ===== BANKER CARD 2 =====
-    yield return DealAndFlip(p2i2, p2CardList[1], p2Slot2);
-
-    bankerSum += GetCardValue(p2CardList[1].name.Substring(1));
-    if (bankerSum >= 10) bankerSum -= 10;
-    bankerSumText.text = bankerSum.ToString();
-
-    yield return new WaitForSeconds(0.4f);
-
-    // ===== OPTIONAL THIRD CARDS =====
-    if (p1CardList.Count > 2)
+    public IEnumerator ShowCards(int playerPair, int bankerPair)
     {
-        yield return DealAndFlip(p1i3, p1CardList[2], p1Slot3);
+        yield return new WaitForSeconds(0.5f);
 
-        playerSum += GetCardValue(p1CardList[2].name.Substring(1));
+        // ===== PLAYER CARD 1 =====
+        yield return DealAndFlip(p1i1, p1CardList[0], p1Slot1);
+
+        playerSum += GetCardValue(p1CardList[0].name.Substring(1));
+        playerSumText.text = playerSum.ToString();
+
+        yield return new WaitForSeconds(0.4f);
+
+        // ===== BANKER CARD 1 =====
+        yield return DealAndFlip(p2i1, p2CardList[0], p2Slot1);
+
+        bankerSum += GetCardValue(p2CardList[0].name.Substring(1));
+        bankerSumText.text = bankerSum.ToString();
+
+        yield return new WaitForSeconds(0.4f);
+
+        // ===== PLAYER CARD 2 =====
+        yield return DealAndFlip(p1i2, p1CardList[1], p1Slot2);
+
+        playerSum += GetCardValue(p1CardList[1].name.Substring(1));
         if (playerSum >= 10) playerSum -= 10;
         playerSumText.text = playerSum.ToString();
 
         yield return new WaitForSeconds(0.4f);
-    }
 
-    if (p2CardList.Count > 2)
-    {
-        yield return DealAndFlip(p2i3, p2CardList[2], p2Slot3);
+        // ===== BANKER CARD 2 =====
+        yield return DealAndFlip(p2i2, p2CardList[1], p2Slot2);
 
-        bankerSum += GetCardValue(p2CardList[2].name.Substring(1));
+        bankerSum += GetCardValue(p2CardList[1].name.Substring(1));
         if (bankerSum >= 10) bankerSum -= 10;
         bankerSumText.text = bankerSum.ToString();
 
         yield return new WaitForSeconds(0.4f);
-    }
 
-    WinnerChk(playerPair, bankerPair);
-}
+        // ===== OPTIONAL THIRD CARDS =====
+        if (p1CardList.Count > 2)
+        {
+            yield return DealAndFlip(p1i3, p1CardList[2], p1Slot3);
+
+            playerSum += GetCardValue(p1CardList[2].name.Substring(1));
+            if (playerSum >= 10) playerSum -= 10;
+            playerSumText.text = playerSum.ToString();
+
+            yield return new WaitForSeconds(0.4f);
+        }
+
+        if (p2CardList.Count > 2)
+        {
+            yield return DealAndFlip(p2i3, p2CardList[2], p2Slot3);
+
+            bankerSum += GetCardValue(p2CardList[2].name.Substring(1));
+            if (bankerSum >= 10) bankerSum -= 10;
+            bankerSumText.text = bankerSum.ToString();
+
+            yield return new WaitForSeconds(0.4f);
+        }
+
+        WinnerChk(playerPair, bankerPair);
+    }
 
 
     int GetCardValue(string value)
@@ -660,7 +665,7 @@ public IEnumerator ShowCards(int playerPair, int bankerPair)
     public void WinnerChk(int playerPair, int bankerPair)
     {
         float winAmount = 0;
-        if(playerPair == 1)
+        if (playerPair == 1)
         {
             winnerAPImg.SetActive(true);
             winAmount += 12 * betAmountPlayerPair;
@@ -674,7 +679,7 @@ public IEnumerator ShowCards(int playerPair, int bankerPair)
         {
             winnerAImg.SetActive(true);
             winAmount += 2 * betAmountPlayer;
-            walletText.text = "₹" + walletAmount.ToString("F2");
+            walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
 
 
         }
@@ -682,7 +687,7 @@ public IEnumerator ShowCards(int playerPair, int bankerPair)
         {
             winnerBImg.SetActive(true);
             winAmount += betAmountBanker * 2;
-            walletText.text = "₹" + walletAmount.ToString("F2");
+            walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
         }
         else
         {
@@ -690,32 +695,30 @@ public IEnumerator ShowCards(int playerPair, int bankerPair)
             winAmount += betAmntTie * 9;
             winAmount += betAmountBanker;
             winAmount += betAmountPlayer;
-            walletText.text = "₹" + walletAmount.ToString("F2");
+            walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
         }
         if (p1CardList[0].name == p1CardList[1].name)
         {
             winnerAPImg.SetActive(true);
             winAmount += 3 * betAmountPlayerPair;
-            walletText.text = "₹" + walletAmount.ToString("F2");
+            walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
         }
         if (p2CardList[0].name == p2CardList[1].name)
         {
             winnerBPImg.SetActive(true);
             winAmount += 3 * betAmountBankerPair;
-            walletText.text = "₹" + walletAmount.ToString("F2");
+            walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
         }
 
         if (winAmount > 0)
         {
-            walletAmount += winAmount;
             winPanel.SetActive(true);
-            winPanelText.text = "You Win\n" + winAmount.ToString("F2");
+            winPanelText.text = "You Win\n" + MoneyFormatter.FormatPaisa((long)winAmount);
             winAudio.Play();
-            walletText.text = walletAmount.ToString("F2");
         }
-        if(betAmntTie + betAmountBanker + betAmountBankerPair + betAmountPlayer + betAmountPlayerPair > 0)
+        if (betAmntTie + betAmountBanker + betAmountBankerPair + betAmountPlayer + betAmountPlayerPair > 0)
         {
-            apisRef.FetchWallet();
+            //apisRef.FetchWallet();
         }
         StartCoroutine(WinnerDisplaly());
     }
@@ -728,13 +731,15 @@ public IEnumerator ShowCards(int playerPair, int bankerPair)
         winPanel.SetActive(false);
 
         yield return new WaitForSeconds(2f);
-       ClearMyCoins();
+        ClearMyCoins();
         winnerAImg.SetActive(false);
         winnerBImg.SetActive(false);
         winnerTieImg.SetActive(false);
         winnerAPImg.SetActive(false);
         winnerBPImg.SetActive(false);
         burstRef.MoveAllcoinsBack();
+
+        _resultAnimationComplete = true;
     }
 
     public void PlayEffect(AudioClip clip)
@@ -756,46 +761,46 @@ public IEnumerator ShowCards(int playerPair, int bankerPair)
 
 
     // ADD THESE IN ManagerBac
-public Transform dealerPoint;
+    public Transform dealerPoint;
 
-public Transform p1Slot1;
-public Transform p1Slot2;
-public Transform p1Slot3;
+    public Transform p1Slot1;
+    public Transform p1Slot2;
+    public Transform p1Slot3;
 
-public Transform p2Slot1;
-public Transform p2Slot2;
-public Transform p2Slot3;
-
-
+    public Transform p2Slot1;
+    public Transform p2Slot2;
+    public Transform p2Slot3;
 
 
-private IEnumerator DealAndFlip(Image cardImage, Sprite newSprite, Transform target)
-{
-    // 1. Start from dealer
-    cardImage.transform.position = dealerPoint.position;
-    // cardImage.transform.rotation = Quaternion.Euler(0, 0, 0);
-    cardImage.sprite = cardImg;   // back card
 
-    // 2. Move to target
-    yield return cardImage.transform
-        .DOMove(target.position, 0.35f)
-        .SetEase(Ease.OutCubic)
-        .WaitForCompletion();
 
-    // 3. Flip animation by code
-    yield return cardImage.transform
-        .DORotate(new Vector3(0, 90, 0), 0.12f)
-        .WaitForCompletion();
+    private IEnumerator DealAndFlip(Image cardImage, Sprite newSprite, Transform target)
+    {
+        // 1. Start from dealer
+        cardImage.transform.position = dealerPoint.position;
+        // cardImage.transform.rotation = Quaternion.Euler(0, 0, 0);
+        cardImage.sprite = cardImg;   // back card
 
-    // change sprite at mid
-    cardImage.sprite = newSprite;
+        // 2. Move to target
+        yield return cardImage.transform
+            .DOMove(target.position, 0.35f)
+            .SetEase(Ease.OutCubic)
+            .WaitForCompletion();
 
-    yield return cardImage.transform
-        .DORotate(new Vector3(0, 0, 0), 0.12f)
-        .WaitForCompletion();
-}
+        // 3. Flip animation by code
+        yield return cardImage.transform
+            .DORotate(new Vector3(0, 90, 0), 0.12f)
+            .WaitForCompletion();
 
-public void ResetCardsPos()
+        // change sprite at mid
+        cardImage.sprite = newSprite;
+
+        yield return cardImage.transform
+            .DORotate(new Vector3(0, 0, 0), 0.12f)
+            .WaitForCompletion();
+    }
+
+    public void ResetCardsPos()
     {
         p1i1.transform.position = dealerPoint.position;
         p1i2.transform.position = dealerPoint.position;

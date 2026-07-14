@@ -4,6 +4,20 @@ using Newtonsoft.Json;
 
 namespace Features.Support.Models
 {
+
+    [JsonObject(MemberSerialization.OptIn)]
+    public class SupportAttachmentDto
+    {
+        [JsonProperty("key")]
+        public string Key;
+
+        [JsonProperty("fileName")]
+        public string FileName;
+
+        [JsonProperty("mimeType")]
+        public string MimeType;
+    }
+
     [Serializable]
     public class CreateTicketRequest
     {
@@ -11,7 +25,7 @@ namespace Features.Support.Models
         public string description;
         public string category;
         public string priority;
-        public string[] attachments;
+        public string[] attachmentMediaIds;
         public object metadata;
         public string dedupKey;
     }
@@ -70,6 +84,15 @@ namespace Features.Support.Models
         public TicketTimelineEvent[] timeline;
     }
 
+    public enum SupportSenderType
+    {
+        User,
+        Admin,
+        System,
+        Moderator,
+        Bot
+    }
+
     [Serializable]
     public class TicketMessage
     {
@@ -81,8 +104,28 @@ namespace Features.Support.Models
         [JsonProperty("senderName")]
         public string authorName;
         public string createdAt;
-        public string[] attachments;
+        public SupportAttachmentDto[] attachments;
         public bool isInternal;
+
+        public SupportSenderType SenderType
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(authorType)) return SupportSenderType.Admin;
+                return authorType.ToLowerInvariant() switch
+                {
+                    "user" => SupportSenderType.User,
+                    "admin" => SupportSenderType.Admin,
+                    "agent" => SupportSenderType.Admin,
+                    "system" => SupportSenderType.System,
+                    "moderator" => SupportSenderType.Moderator,
+                    "bot" => SupportSenderType.Bot,
+                    _ => SupportSenderType.Admin
+                };
+            }
+        }
+
+        public bool IsUser => SenderType == SupportSenderType.User;
     }
     public enum ReplyResult
     {
@@ -107,7 +150,6 @@ namespace Features.Support.Models
     {
         [JsonProperty("message")]
         public string body;
-        public string[] attachments;
     }
 
     [Serializable]
@@ -149,9 +191,9 @@ namespace Features.Support.Models
 
     public static class TicketCategory
     {
-        public const string ACCOUNT = "ACCOUNT";
-        public const string PAYMENT = "PAYMENT";
-        public const string GAMEPLAY = "GAMEPLAY";
+        public const string ACCOUNT = "ACCOUNT_ISSUE";
+        public const string PAYMENT = "PAYMENT_ISSUE";
+        public const string GAMEPLAY = "GAMEPLAY_ISSUE";
         public const string OTHER = "OTHER";
     }
 

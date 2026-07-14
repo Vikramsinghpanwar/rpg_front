@@ -5,10 +5,12 @@ using TMPro;
 using System.Collections.Generic;
 using System.Text;
 using System.Security.Cryptography;
+using Core.Utils;
+using Core.Bootstrap;
 
 public class GameRuleManager : MonoBehaviour
 {
-        public static GameRuleManager Instance;
+    public static GameRuleManager Instance;
 
     private System.Random random1;
     private System.Random random2;
@@ -51,8 +53,9 @@ public class GameRuleManager : MonoBehaviour
     public TextMeshProUGUI showWinText;
     public TextMeshProUGUI walletText;
     public float walletAmount;
+    private bool _resultAnimationComplete;
     public GameObject waitForNext, showWinPanel, betStart, betStop, addCashPanel; // Reference to the MoneyManager
-    
+
     TableBotManager botManagerRef;
 
 
@@ -72,28 +75,34 @@ public class GameRuleManager : MonoBehaviour
     public Image resBall1_Img;
     public Image resBall2_Img;
     public Sprite[] ballImages_Array;
-    APIs apisRef;
     BetManager betManagerRef;
 
 
     void Awake()
     {
-        if(Instance != this)
+        if (Instance != this)
         {
             Instance = this;
         }
     }
 
-       public void RegisterTouch(Vector3 touch)
+    public void RegisterTouch(Vector3 touch)
     {
         recentTouchPos = touch;
     }
 
-    private void UpdateWallet(float wAmount)
+    public void UpdateWallet(float wAmount)
     {
         walletAmount = wAmount;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount));
     }
+
+    public void BeginResultProcessing()
+    {
+        _resultAnimationComplete = false;
+    }
+
+    public bool IsResultAnimationComplete => _resultAnimationComplete;
 
     public void InitializeBots(List<BotData> data, long roundStartTime)
     {
@@ -119,12 +128,9 @@ public class GameRuleManager : MonoBehaviour
 
     void Start()
     {
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
-        apisRef.FetchWallet();
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
         betManagerRef = FindObjectOfType<BetManager>();
 
-        // burstWJ = FindObjectOfType<BurstWJ>();
         randomHistoryWL = FindObjectOfType<RandomHistoryWL>();
         socketManagerWL = FindObjectOfType<SocketManagerWL>();
         lotteryBallAnimation = FindObjectOfType<LotteryBallAnimation>();
@@ -290,19 +296,19 @@ public class GameRuleManager : MonoBehaviour
             int w = (randomValue13 * 50);
 
 
-            betAmountText[0].text = $"<color=yellow>{totalBets_Array[0]}</color><color=#02ccfe>/{k}</color>";
-            betAmountText[1].text = $"<color=yellow>{totalBets_Array[1]}</color><color=#02ccfe>/{l}</color>";
-            betAmountText[2].text = $"<color=yellow>{totalBets_Array[2]}</color><color=#02ccfe>/{m}</color>";
-            betAmountText[3].text = $"<color=yellow>{totalBets_Array[3]}</color><color=#02ccfe>/{n}</color>";
-            betAmountText[4].text = $"<color=yellow>{totalBets_Array[4]}</color><color=#02ccfe>/{o}</color>";
-            betAmountText[5].text = $"<color=yellow>{totalBets_Array[5]}</color><color=#02ccfe>/{p}</color>";
-            betAmountText[6].text = $"<color=yellow>{totalBets_Array[6]}</color><color=#02ccfe>/{q}</color>";
-            betAmountText[7].text = $"<color=yellow>{totalBets_Array[7]}</color><color=#02ccfe>/{r}</color>";
-            betAmountText[8].text = $"<color=yellow>{totalBets_Array[8]}</color><color=#02ccfe>/{s}</color>";
-            betAmountText[9].text = $"<color=yellow>{totalBets_Array[9]}</color><color=#02ccfe>/{t}</color>";
-            betAmountText[10].text = $"<color=yellow>{totalBets_Array[10]}</color><color=#02ccfe>/{u}</color>";
-            betAmountText[11].text = $"<color=yellow>{totalBets_Array[11]}</color><color=#02ccfe>/{v}</color>";
-            betAmountText[12].text = $"<color=yellow>{totalBets_Array[12]}</color><color=#02ccfe>/{w}</color>";
+            betAmountText[0].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[0])}</color><color=#02ccfe>/{k}</color>";
+            betAmountText[1].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[1])}</color><color=#02ccfe>/{l}</color>";
+            betAmountText[2].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[2])}</color><color=#02ccfe>/{m}</color>";
+            betAmountText[3].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[3])}</color><color=#02ccfe>/{n}</color>";
+            betAmountText[4].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[4])}</color><color=#02ccfe>/{o}</color>";
+            betAmountText[5].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[5])}</color><color=#02ccfe>/{p}</color>";
+            betAmountText[6].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[6])}</color><color=#02ccfe>/{q}</color>";
+            betAmountText[7].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[7])}</color><color=#02ccfe>/{r}</color>";
+            betAmountText[8].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[8])}</color><color=#02ccfe>/{s}</color>";
+            betAmountText[9].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[9])}</color><color=#02ccfe>/{t}</color>";
+            betAmountText[10].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[10])}</color><color=#02ccfe>/{u}</color>";
+            betAmountText[11].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[11])}</color><color=#02ccfe>/{v}</color>";
+            betAmountText[12].text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)totalBets_Array[12])}</color><color=#02ccfe>/{w}</color>";
 
 
             yield return new WaitForSeconds(updateInterval);
@@ -353,33 +359,33 @@ public class GameRuleManager : MonoBehaviour
     {
         Debug.Log("radhey");
         int totalBet = 0;
-        for (int i = 0; i< totalBets_Array.Length; i++)
+        for (int i = 0; i < totalBets_Array.Length; i++)
         {
-            totalBet += totalBets_Array[i]; 
+            totalBet += totalBets_Array[i];
         }
-        if(totalBet <= 0) return;
-        if(!bettingAllow) return;
-        
-        walletAmount += totalBet;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        if (totalBet <= 0) return;
+        if (!bettingAllow) return;
 
- for (int i = 0; i< totalBets_Array.Length; i++)
+        walletAmount += totalBet;
+        walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
+
+        for (int i = 0; i < totalBets_Array.Length; i++)
         {
-            totalBets_Array[i] = 0; 
+            totalBets_Array[i] = 0;
         }
-        
-                socketManagerWL.ClearAllBets();
+
+        socketManagerWL.ClearAllBets();
         ClearMyCoins();
     }
 
     public List<GameObject> myCoinsList;
     public Transform myCoinHolder;
-        Vector3 recentTouchPos;
+    Vector3 recentTouchPos;
 
 
     void ClearMyCoins()
     {
-        foreach(GameObject g in myCoinsList)
+        foreach (GameObject g in myCoinsList)
         {
             Destroy(g);
         }
@@ -387,7 +393,7 @@ public class GameRuleManager : MonoBehaviour
     }
 
     void InstantiateCoin()
-    {        
+    {
         GameObject coin = Instantiate(TableBotManager.Instance.coinPrefabList[betManagerRef.betChipNum - 1], myCoinHolder);
         coin.transform.localScale = Vector3.one;
         coin.transform.position = recentTouchPos;
@@ -411,14 +417,14 @@ public class GameRuleManager : MonoBehaviour
             return;
         }
 
-        walletAmount -= betManagerRef.betVal;
+        walletAmount -= betManagerRef.betVal * 100;
         UpdateWallet(walletAmount);
-        totalBets_Array[number] += betManagerRef.betVal;
+        totalBets_Array[number] += betManagerRef.betVal * 100;
         Debug.Log("Total bets on number " + number + ": " + totalBets_Array[number]);
-            InstantiateCoin();
+        InstantiateCoin();
 
-        DeductBetAmount(betManagerRef.betVal);
-        socketManagerWL.SendBetDataToServer(number, betManagerRef.betVal);
+        DeductBetAmount(betManagerRef.betVal * 100);
+        socketManagerWL.SendBetDataToServer(number, betManagerRef.betVal * 100);
 
     }
 
@@ -495,7 +501,7 @@ public class GameRuleManager : MonoBehaviour
             bet9.SetActive(true);
             betGreen.SetActive(true);
         }
-               ClearMyCoins();
+        ClearMyCoins();
 
 
         UserWinnigAmount(winner);
@@ -528,16 +534,14 @@ public class GameRuleManager : MonoBehaviour
             {
                 totalWinnings += totalBets_Array[10] * 2;
             }
-            else if ( winner == 0) totalWinnings += totalBets_Array[12] * 1.5f;
+            else if (winner == 0) totalWinnings += totalBets_Array[12] * 1.5f;
             else if (winner == 5) totalWinnings += totalBets_Array[10] * 1.5f;
 
         }
 
-Debug.Log("total user winning:  " + totalWinnings);
+        Debug.Log("total user winning:  " + totalWinnings);
         if (totalWinnings > 0)
         {
-            UpdateWallet(walletAmount + totalWinnings);
-            Wallet.AddToWinWallet(totalWinnings);
             StartCoroutine(ShowWinAmount());
         }
 
@@ -547,7 +551,7 @@ Debug.Log("total user winning:  " + totalWinnings);
     IEnumerator ShowWinAmount()
     {
         showWinPanel.SetActive(true);
-        showWinText.text = totalWinnings.ToString();  // Display total winnings
+        showWinText.text = MoneyFormatter.FormatPaisa((long)totalWinnings);  // Display total winnings
         yield return new WaitForSeconds(2f);
         showWinPanel.SetActive(false);
     }
@@ -559,14 +563,12 @@ Debug.Log("total user winning:  " + totalWinnings);
         {
             int bonusWinnings = totalBets_Array[10] * 2;  // 2x multiplier for number 10
             totalWinnings += bonusWinnings;
-            Wallet.AddToWinWallet(bonusWinnings);
         }
 
         if (IsBonusForNumber(winner, new int[] { 0, 5 }) && totalBets_Array[11] > 0)
         {
             int bonusWinnings = Mathf.RoundToInt(totalBets_Array[11] * 4.5f);  // 4.5x multiplier for number 11
             totalWinnings += bonusWinnings;
-            Wallet.AddToWinWallet(bonusWinnings);
         }
 
         // JOIN RED: Number 12 wins if the result is 2, 4, 6, or 8 (2x multiplier)
@@ -574,7 +576,6 @@ Debug.Log("total user winning:  " + totalWinnings);
         {
             int bonusWinnings = totalBets_Array[12] * 2;  // 2x multiplier for number 12
             totalWinnings += bonusWinnings;
-            Wallet.AddToWinWallet(bonusWinnings);
         }
 
         // Additional special win conditions based on the result
@@ -585,7 +586,6 @@ Debug.Log("total user winning:  " + totalWinnings);
             {
                 int bonusWinnings = Mathf.RoundToInt(totalBets_Array[0] * 1.5f);  // 1.5x multiplier for number 0
                 totalWinnings += bonusWinnings;
-                Wallet.AddToWinWallet(bonusWinnings);
             }
         }
         else if (winner == 5)
@@ -595,7 +595,6 @@ Debug.Log("total user winning:  " + totalWinnings);
             {
                 int bonusWinnings = Mathf.RoundToInt(totalBets_Array[5] * 1.5f);  // 1.5x multiplier for number 5
                 totalWinnings += bonusWinnings;
-                Wallet.AddToWinWallet(bonusWinnings);
             }
         }
     }
@@ -648,6 +647,7 @@ Debug.Log("total user winning:  " + totalWinnings);
 
         // burstWJ.MoveAllcoinsBack();
 
+        _resultAnimationComplete = true;
     }
 
     private void ResetAnimatorBools()
@@ -676,7 +676,7 @@ Debug.Log("total user winning:  " + totalWinnings);
         for (int i = 0; i < totalBets_Array.Length; i++)
         {
             totalBets_Array[i] = 0;
-            betAmountText[i].text = "0";
+            betAmountText[i].text = MoneyFormatter.FormatPaisa(0);
         }
         totalWinnings = 0;
     }

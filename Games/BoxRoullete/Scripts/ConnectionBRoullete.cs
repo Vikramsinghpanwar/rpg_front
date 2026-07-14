@@ -9,7 +9,7 @@ public class ConnectionBRoullete : MonoBehaviour
     public ManagerBRoullete csBankRef;
     public float walletAmount;
     public AudioSource BGM;
-    
+
 
 
 
@@ -24,18 +24,18 @@ public class ConnectionBRoullete : MonoBehaviour
     {
         BGM.Stop();
 
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 
-       public void AddCash()
+    public void AddCash()
     {
         BGM.Stop();
         PlayerPrefs.SetInt("_addCash", 1);
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 
 
 
 
-   
+
 }

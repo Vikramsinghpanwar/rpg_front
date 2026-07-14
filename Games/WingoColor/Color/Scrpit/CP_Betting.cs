@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Core.Utils;
 
 public class CP_Betting : MonoBehaviour
 {
@@ -73,20 +74,20 @@ public class CP_Betting : MonoBehaviour
                 ImageComponents[1].color = HexToColor(Colorr); 
                 
                 if(rowData.betamount < rowData.winamount){
-                    textComponents[4].text = "+" + rowData.winamount.ToString();
+                     textComponents[4].text = "+" + MoneyFormatter.FormatPaisa((long)(rowData.winamount * 100));
                     textComponents[4].color = HexToColor("#0f9d58");
                     textComponents[5].color = HexToColor("#0f9d58");
                     textComponents[5].text = "Success";
                     ImageComponents[2].color = HexToColor("#0f9d58"); 
                  }else{
-                    textComponents[4].text = "-" + rowData.betamount.ToString();
+                     textComponents[4].text = "-" + MoneyFormatter.FormatPaisa((long)(rowData.betamount * 100));
                     textComponents[4].color = HexToColor("#ff5f5e");
                     textComponents[5].color = HexToColor("#ff5f5e");
                     textComponents[5].text = "Failed";
                     ImageComponents[2].color = HexToColor("#ff5f5e"); 
                  }
                    if(oldGameId == rowData.gameid){
-                    textComponents[4].text = rowData.betamount.ToString();
+                     textComponents[4].text = MoneyFormatter.FormatPaisa((long)(rowData.betamount * 100));
                     textComponents[4].color = HexToColor("#0f9d58");
                     textComponents[5].color = HexToColor("#0f9d58");
                     textComponents[5].text = "Pending";
@@ -115,10 +116,10 @@ private Color HexToColor(string hex)
         foreach (MyBetsData bet in MyBetData){
             if (bet.id == iddd){
                 SelectMyBetShow.text = bet.select;
-                PurchaseAmount.text = bet.Purchase.ToString();
+                PurchaseAmount.text = MoneyFormatter.FormatPaisa((long)(bet.Purchase * 100));
                 ResultMyBetShow.text = bet.result;
-                TexMyBetShow.text = bet.tex.ToString();
-                AmountAfterTax.text = (bet.Purchase-bet.tex).ToString();
+                TexMyBetShow.text = MoneyFormatter.FormatPaisa((long)(bet.tex * 100));
+                AmountAfterTax.text = MoneyFormatter.FormatPaisa((long)((bet.Purchase - bet.tex) * 100));
             }
         }
     }

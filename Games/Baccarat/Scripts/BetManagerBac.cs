@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using Core.Utils;
 
 public class BetManagerBac : MonoBehaviour
 {
@@ -234,7 +235,7 @@ public class BetManagerBac : MonoBehaviour
     IEnumerator MoveObject(Vector3 initialPos, Vector3 targetPos, Transform coinTransform)
     {
         wallet -= Random.Range(100, 1000);
-        walletAmtText.text = "Rs. " + wallet.ToString();
+        walletAmtText.text = MoneyFormatter.FormatPaisa(wallet);
         Vector3 targetPosModified = targetPos + new Vector3(Random.Range(-area, area), Random.Range(-area, area), 0);
 
         float startTime = Time.time;

@@ -7,7 +7,10 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SocketIOClient.Newtonsoft.Json;
 using UnityEngine.SceneManagement;
+using System.Threading.Tasks;
+using Core.API;
 using Core.Config;
+using Core.Services;
 using Features.Lobby.Integration;
 
 public class SocketManagerJackpot : MonoBehaviour
@@ -86,7 +89,7 @@ public class SocketManagerJackpot : MonoBehaviour
         {
             Query = new Dictionary<string, string>
             {
-                {"token", "UNITY" }
+                {"token", TokenProvider.Instance?.AccessToken ?? string.Empty}
             },
             Transport = SocketIOClient.Transport.TransportProtocol.WebSocket
         });
@@ -209,11 +212,8 @@ public class SocketManagerJackpot : MonoBehaviour
 
             //  manager.ShowCards(cardsArray.ToObject<List<string>>()); 
             StartCoroutine(CallShowCardsWithDelay(cardsArray.ToObject<List<string>>(), winner));
-
-            // manager.randomResult = winner;  
-
-
             historyJackpot.AddResultToHistory(winner);
+            _ = CGSBetService.Instance.RefreshWalletAsync();
         }
         catch (Exception ex)
         {
@@ -234,28 +234,24 @@ public class SocketManagerJackpot : MonoBehaviour
 
     public void ClearAllBets()
     {
-        var data = new Dictionary<string, object>
-        {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("clearAllBet", jsonData);
+        // Bets are HTTP-authoritative — no socket emit needed for clear
     }
 
-    public void SendBetDataToServer(int betOn, float betAmount, int userId)
+    public void SendBetDataToServer(int betOn, long betAmount, int userId)
     {
-        Debug.Log("Sending bet data: Bet on " + betOn + " with amount " + betAmount + " with userId " + userId);
-        var data = new Dictionary<string, object>
-        {
-            { "betOn", betOn },
-            { "betAmount", betAmount },
-            { "userId", userId }
-        };
+        _ = SendBetAsync(betOn, betAmount);
+    }
 
-        string jsonData = JsonConvert.SerializeObject(data);
-        Debug.Log("JSON: " + jsonData);
-        socket.Emit("sendData", jsonData);
+    async Task SendBetAsync(int betOn, long betAmount)
+    {
+        try
+        {
+            await CGSBetService.Instance.PlaceBetAsync(CGSGameKeys.Jackpot, betOn, (long)betAmount);
+        }
+        catch (ApiException ex)
+        {
+            Debug.LogWarning($"[SocketManagerJackpot] Bet rejected: {ex.StatusCode} {ex.Message}");
+        }
     }
 }
 

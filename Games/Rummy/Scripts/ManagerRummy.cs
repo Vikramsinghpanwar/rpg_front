@@ -53,7 +53,7 @@ public class ManagerRummy : MonoBehaviour
     public TextMeshProUGUI fPanel_p2Bonus;
     public TextMeshProUGUI fPanel_p2Name;
     public Coroutine gameCoroutine;
-    public int playerChance; 
+    public int playerChance;
     Coroutine p2Coroutine;
     Coroutine p3Coroutine;
     Coroutine p4Coroutine;
@@ -122,10 +122,10 @@ public class ManagerRummy : MonoBehaviour
                             StartCoroutine(AutoPlay(2));
                         }
                     }
-                        
+
                     Debug.Log("Your Chance");
                     //timer yaha se start krna hai
-                   
+
                 }
                 else
                 {
@@ -166,30 +166,30 @@ public class ManagerRummy : MonoBehaviour
                     switch (playerChance)
                     {
                         case 2:
-                            if(elapsedTime > 54)
+                            if (elapsedTime > 54)
                             {
                                 // player pack 
                                 myTimer.GetComponent<Image>().fillAmount = 0;
                                 obstaclePanel.SetActive(true);
-                                StartCoroutine(AutoPlay(Random.Range(2,6)));
+                                StartCoroutine(AutoPlay(Random.Range(2, 6)));
                                 return;
                             }
-                            else if(elapsedTime > 24)
+                            else if (elapsedTime > 24)
                             {
                                 gameCoroutine = StartCoroutine(GameEnum(7));
                                 return;
                             }
                             else
                             {
-                                if(elapsedTime > 5)
+                                if (elapsedTime > 5)
                                 {
                                     gameCoroutine = StartCoroutine(GameEnum(3));
                                 }
-                                else if(elapsedTime > 11)
+                                else if (elapsedTime > 11)
                                 {
                                     gameCoroutine = StartCoroutine(GameEnum(4));
                                 }
-                                else if(elapsedTime > 16)
+                                else if (elapsedTime > 16)
                                 {
                                     gameCoroutine = StartCoroutine(GameEnum(5));
                                 }
@@ -340,7 +340,7 @@ public class ManagerRummy : MonoBehaviour
                     }
 
 
-                   
+
                 }
 
             }
@@ -548,18 +548,18 @@ public class ManagerRummy : MonoBehaviour
             StopCoroutine(p6Coroutine);
             p6Timer.GetComponent<Image>().fillAmount = 0;
         }
-      
-       
 
-       
-       
 
-      
+
+
+
+
+
 
         //player chance
-        #if UNITY_ANDROID || PLATFORM_ANDROID
-                    Handheld.Vibrate();
-                #endif
+#if UNITY_ANDROID || PLATFORM_ANDROID
+        Handheld.Vibrate();
+#endif
 
         myTimerCoroutine = StartCoroutine(DecreaseOverTime(myTimer));
         getCardBarrier.SetActive(false);
@@ -568,13 +568,13 @@ public class ManagerRummy : MonoBehaviour
     int autoRounds = 0;
     public IEnumerator AutoPlay(int startPos = 0)
     {
-        
+
         while (autoRounds < 8)
         {
 
             autoRounds++;
 
-            if(startPos <= 2)
+            if (startPos <= 2)
             {
                 //player 2 chance
                 Coroutine p2Coroutine = StartCoroutine(DecreaseOverTime(p2Timer));
@@ -722,13 +722,13 @@ public class ManagerRummy : MonoBehaviour
                 StopCoroutine(p6Coroutine);
                 p6Timer.GetComponent<Image>().fillAmount = 0;
             }
-          
-           
-           
-           
-           
 
-           
+
+
+
+
+
+
 
         }
         {
@@ -817,7 +817,7 @@ public class ManagerRummy : MonoBehaviour
             yield return null;
         }
 
-        if(gobj == myTimer)
+        if (gobj == myTimer)
         {
             obstaclePanel.SetActive(true);
 
@@ -853,12 +853,12 @@ public class ManagerRummy : MonoBehaviour
       });
             selectedCardsList[0].transform.SetParent(finishSlotPos);
             selectedCardsList.Clear();
-          
+
 
         }
         else
         {
-        
+
             for (int i = 0; i < initialCardDistributorRef.mainBlock.transform.childCount; i++)
             {
                 totalCardSum += initialCardDistributorRef.mainBlock.transform.GetChild(i).GetComponent<CardsChecker>().blockSum;
@@ -871,7 +871,7 @@ public class ManagerRummy : MonoBehaviour
 
     public void Leave()
     {
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 
     public void StartAgain()
@@ -897,11 +897,11 @@ public class ManagerRummy : MonoBehaviour
         {
             Time.timeScale *= 2;
         }
-        
+
         if (Input.GetKeyDown(KeyCode.LeftArrow))
         {
             Time.timeScale /= 2;
         }
-        
+
     }
 }

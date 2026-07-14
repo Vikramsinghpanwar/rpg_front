@@ -5,10 +5,12 @@ using UnityEngine.UI;
 using TMPro;
 using System.Security.Cryptography;
 using System.Text;
+using Core.Utils;
+using Core.Bootstrap;
 
 public class CarRoulleteManager : MonoBehaviour
 {
-    public static CarRoulleteManager Instance { get; set;}
+    public static CarRoulleteManager Instance { get; set; }
 
     public AudioClip noMoreBets_Clip;
     public AudioClip placeYourBets_Clip;
@@ -69,6 +71,7 @@ public class CarRoulleteManager : MonoBehaviour
     public Image JokerImg;
     public Text walletText;
     float walletAmount;
+    private bool _resultAnimationComplete;
     TileGlowController tileScript;
     public bool _bet1, _bet2, _bet3, _bet4, _bet5, _bet6, _bet7, _bet8;
     public int bet1BetVal, bet2BetVal, bet3BetVal, bet4BetVal, bet5BetVal, bet6BetVal, bet7BetVal, bet8BetVal;
@@ -86,12 +89,11 @@ public class CarRoulleteManager : MonoBehaviour
 
 
     public BetManager betManagerRef;
-    SocketManagerCarRoulette  socketManager;
+    SocketManagerCarRoulette socketManager;
     public Transform myCoinHolder;
     Vector3 recentTouchPos;
 
 
-    APIs apisRef;
     TableBotManager botManagerRef;
     int[] botWinArray;
 
@@ -103,7 +105,7 @@ public class CarRoulleteManager : MonoBehaviour
 
     void Awake()
     {
-        if(Instance != this)
+        if (Instance != this)
         {
             Instance = this;
         }
@@ -117,13 +119,8 @@ public class CarRoulleteManager : MonoBehaviour
 
     public void CheckForPendingBets()
     {
-        Debug.Log("Checking");
         if (PlayerPrefs.GetString("car_r_roundId") == socketManager.currentRoundId)
         {
-            Debug.Log("same round");
-            Debug.Log(PlayerPrefs.GetInt("car_r_betsOnDragon"));
-            Debug.Log(PlayerPrefs.GetInt("car_r_betsOnTiger"));
-            Debug.Log(PlayerPrefs.GetInt("car_r_betsOnTie"));
             if (PlayerPrefs.GetInt("car_r_betsOn1") > 0)
             {
                 bet1BetVal = PlayerPrefs.GetInt("car_r_betsOn1");
@@ -160,7 +157,7 @@ public class CarRoulleteManager : MonoBehaviour
             {
                 bet8BetVal = PlayerPrefs.GetInt("car_r_betsOn8");
             }
-      
+
 
         }
         else
@@ -169,8 +166,6 @@ public class CarRoulleteManager : MonoBehaviour
             PlayerPrefs.SetInt("car_r_betsOnTiger", 0);
             PlayerPrefs.SetInt("car_r_betsOnTie", 0);
 
-            Debug.Log("p.r : " + PlayerPrefs.GetString("car_r_roundId"));
-            Debug.Log("c.r : " + socketManager.currentRoundId);
         }
     }
 
@@ -208,7 +203,7 @@ public class CarRoulleteManager : MonoBehaviour
 
         StartCoroutine(ShowResultEnum(winIndex));
         botWinArray = new int[6];
-        for(int i = 0; i< botWinIndexArray.Length; i++)
+        for (int i = 0; i < botWinIndexArray.Length; i++)
         {
             botWinArray[i] = botWinIndexArray[i];
         }
@@ -217,7 +212,7 @@ public class CarRoulleteManager : MonoBehaviour
     IEnumerator WaitinPanelCountDown()
     {
         int k = Random.Range(2, 10);
-        for(int i = 0; i<=k; i++)
+        for (int i = 0; i <= k; i++)
         {
             timeTowaitTxt.text = (k - i).ToString();
             yield return new WaitForSeconds(1f);
@@ -230,8 +225,6 @@ public class CarRoulleteManager : MonoBehaviour
 
     void Start()
     {
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
         botManagerRef = FindObjectOfType<TableBotManager>();
         socketManager = FindObjectOfType<SocketManagerCarRoulette>();
         historyRef = FindObjectOfType<HistoryGeneratorCarRoullete>();
@@ -241,10 +234,8 @@ public class CarRoulleteManager : MonoBehaviour
         tileScript = FindObjectOfType<TileGlowController>();
         stopBetPanel.SetActive(false);
         startBetPanel.SetActive(false);
-        //deck = new List<Card>();
         waitingPanel.SetActive(true);
-        apisRef.FetchWallet();
-
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
     }
 
     public void InitializeBots(List<BotData> data, long roundStartTime)
@@ -274,11 +265,18 @@ public class CarRoulleteManager : MonoBehaviour
 
     }
 
-    private void UpdateWallet(float wAmount)
+    public void UpdateWallet(float wAmount)
     {
         walletAmount = wAmount;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
     }
+
+    public void BeginResultProcessing()
+    {
+        _resultAnimationComplete = false;
+    }
+
+    public bool IsResultAnimationComplete => _resultAnimationComplete;
 
     void DeleteChildren(Transform parent)
     {
@@ -370,7 +368,7 @@ public class CarRoulleteManager : MonoBehaviour
             int increment6 = random6.Next(1, 10);
             int increment7 = random7.Next(1, 10);
             int increment8 = random8.Next(1, 10);
-    
+
 
             if (rvi < 37)
             {
@@ -383,7 +381,7 @@ public class CarRoulleteManager : MonoBehaviour
                 randomValue6 += increment6;
                 randomValue7 += increment7;
                 randomValue8 += increment8;
-       
+
             }
 
 
@@ -395,17 +393,17 @@ public class CarRoulleteManager : MonoBehaviour
             int p = (randomValue6 * 50);
             int q = (randomValue7 * 50);
             int r = (randomValue8 * 50);
-         
 
-            slot1.text = $"<color=yellow>{bet1BetVal}</color><color=#02ccfe>/{k}</color>";
-            slot2.text = $"<color=yellow>{bet2BetVal}</color><color=#02ccfe>/{l}</color>";
-            slot3.text = $"<color=yellow>{bet3BetVal}</color><color=#02ccfe>/{m}</color>";
-            slot4.text = $"<color=yellow>{bet4BetVal}</color><color=#02ccfe>/{n}</color>";
-            slot5.text = $"<color=yellow>{bet5BetVal}</color><color=#02ccfe>/{o}</color>";
-            slot6.text = $"<color=yellow>{bet6BetVal}</color><color=#02ccfe>/{p}</color>";
-            slot7.text = $"<color=yellow>{bet7BetVal}</color><color=#02ccfe>/{q}</color>";
-            slot8.text = $"<color=yellow>{bet8BetVal}</color><color=#02ccfe>/{r}</color>";
-     
+
+            slot1.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(bet1BetVal)}</color><color=#02ccfe>/{k}</color>";
+            slot2.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(bet2BetVal)}</color><color=#02ccfe>/{l}</color>";
+            slot3.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(bet3BetVal)}</color><color=#02ccfe>/{m}</color>";
+            slot4.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(bet4BetVal)}</color><color=#02ccfe>/{n}</color>";
+            slot5.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(bet5BetVal)}</color><color=#02ccfe>/{o}</color>";
+            slot6.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(bet6BetVal)}</color><color=#02ccfe>/{p}</color>";
+            slot7.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(bet7BetVal)}</color><color=#02ccfe>/{q}</color>";
+            slot8.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(bet8BetVal)}</color><color=#02ccfe>/{r}</color>";
+
 
             yield return new WaitForSeconds(updateInterval);
         }
@@ -472,7 +470,7 @@ public class CarRoulleteManager : MonoBehaviour
         yield return new WaitForSeconds(1f);
         startBetPanel.SetActive(false);
         StartCoroutine(tileScript.CountDown(remTime));
-       
+
     }
 
     IEnumerator ShowResultEnum(int stopAt)
@@ -482,8 +480,8 @@ public class CarRoulleteManager : MonoBehaviour
         stopBetPanel.SetActive(true);
 
         betRoda.SetActive(true);
-     
-        if(betAmountCoroutineRef != null)
+
+        if (betAmountCoroutineRef != null)
         {
             StopCoroutine(betAmountCoroutineRef);
         }
@@ -727,19 +725,19 @@ public class CarRoulleteManager : MonoBehaviour
             winImgArray[7].SetActive(true);
 
         }
-        if(winAmount > 0)
+        if (winAmount > 0)
         {
             walletAmount += winAmount;
         }
 
         botManagerRef.BotWin(botWinArray);
         yield return new WaitForSeconds(2);
-       
-        walletText.text = "₹" + walletAmount.ToString("F2");
+
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
         if (winAmount > 0)
         {
             winPanel.SetActive(true);
-            winPanelAmntText.text = "₹ " + winAmount;
+            winPanelAmntText.text = MoneyFormatter.FormatPaisa((long)winAmount);
             myWin.Play();
             yield return new WaitForSeconds(2);
             winPanel.SetActive(false);
@@ -750,26 +748,28 @@ public class CarRoulleteManager : MonoBehaviour
 
         winnerImgDisplayer.SetActive(false);
 
-       
+
         yield return new WaitForSeconds(2);
-        target1A.SetBool("_is",false);
-        target2A.SetBool("_is",false);
-        target3A.SetBool("_is",false);
-        target4A.SetBool("_is",false);
-        target5A.SetBool("_is",false);
-        target6A.SetBool("_is",false);
-        target7A.SetBool("_is",false);
-        target8A.SetBool("_is",false);
-        for(int i= 0; i<winImgArray.Length; i++)
+        target1A.SetBool("_is", false);
+        target2A.SetBool("_is", false);
+        target3A.SetBool("_is", false);
+        target4A.SetBool("_is", false);
+        target5A.SetBool("_is", false);
+        target6A.SetBool("_is", false);
+        target7A.SetBool("_is", false);
+        target8A.SetBool("_is", false);
+        for (int i = 0; i < winImgArray.Length; i++)
         {
             winImgArray[i].SetActive(false);
         }
         yield return new WaitForSeconds(1f);
         // burstManager.MoveAllcoinsBack(true);
         tileScript.tiles[index].color = new Color(1, 1, 1, 0);
-  
+
         winnerImgDisplayerImage.sprite = null;
         yield return new WaitForSeconds(1f);
+
+        _resultAnimationComplete = true;
     }
 
 
@@ -777,19 +777,19 @@ public class CarRoulleteManager : MonoBehaviour
     {
         totalBetAmount += val;
         walletAmount -= val;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
     }
 
     public void ClearAllBets()
     {
-                if (betRoda.activeInHierarchy) return;
+        if (betRoda.activeInHierarchy) return;
 
-        if(bet1BetVal <=0 && bet2BetVal <=0 && bet3BetVal <=0 && bet4BetVal <=0 && bet5BetVal <=0 && bet6BetVal <=0 && bet7BetVal <=0 && bet8BetVal <= 0) return;
+        if (bet1BetVal <= 0 && bet2BetVal <= 0 && bet3BetVal <= 0 && bet4BetVal <= 0 && bet5BetVal <= 0 && bet6BetVal <= 0 && bet7BetVal <= 0 && bet8BetVal <= 0) return;
         _bet1 = _bet2 = _bet3 = _bet4 = _bet5 = _bet6 = _bet7 = _bet8 = false;
 
         totalBetAmount = 0;
         walletAmount += bet1BetVal + bet2BetVal + bet3BetVal + bet4BetVal + bet5BetVal + bet6BetVal + bet7BetVal + bet8BetVal;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
 
         bet1BetVal = bet2BetVal = bet3BetVal = bet4BetVal = bet5BetVal = bet6BetVal = bet7BetVal = bet8BetVal = 0;
         socketManager.ClearlAllBets();
@@ -801,7 +801,7 @@ public class CarRoulleteManager : MonoBehaviour
     {
         if (!betRoda.activeInHierarchy)
         {
-            int val = betManagerRef.betVal;
+            int val = betManagerRef.betVal * 100;
             if (walletAmount >= val)
             {
                 Munim(val);
@@ -813,7 +813,7 @@ public class CarRoulleteManager : MonoBehaviour
                         _bet1 = true;
                         bet1BetVal += val;
                         break;
-                        
+
                     case 2:
                         _bet2 = true;
                         bet2BetVal += val;
@@ -843,7 +843,7 @@ public class CarRoulleteManager : MonoBehaviour
                         bet8BetVal += val;
                         break;
 
-                            
+
                 }
             }
             else
@@ -855,7 +855,7 @@ public class CarRoulleteManager : MonoBehaviour
     }
 
     void InstantiateCoin()
-    {        
+    {
         coinSound.Play();
         GameObject coin = Instantiate(TableBotManager.Instance.coinPrefabList[betManagerRef.betChipNum - 1], myCoinHolder);
         coin.transform.localScale = Vector3.one;
@@ -866,7 +866,7 @@ public class CarRoulleteManager : MonoBehaviour
 
     void ClearMyCoins()
     {
-        foreach(GameObject g in myCoinsList)
+        foreach (GameObject g in myCoinsList)
         {
             Destroy(g);
         }

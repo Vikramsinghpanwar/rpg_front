@@ -92,9 +92,9 @@
 //                 }
 //                 else if (witharray[0].status == 4)
 //                  {
-//                      SceneManager.LoadScene(0);
+//                      SceneManager.LoadScene("Auth");
 //                      yield break;
-                
+
 
 //                 }
 //             }
@@ -106,11 +106,11 @@
 //     }
 
 
-  
+
 
 //     private void Start()
 //     {
-        
+
 //         // Check if a login token exists
 //         if (PlayerPrefs.HasKey(loginTokenKey))
 //         {
@@ -164,7 +164,7 @@
 //         PlayerPrefs.DeleteKey(loginTokenKey);
 //         PlayerPrefs.Save();
 //         // errorText.text = "Logged out successfully.";
-//         SceneManager.LoadScene(0);
+//         SceneManager.LoadScene("Auth");
 //     }
 
 
@@ -226,7 +226,7 @@
 
 
 
-   
+
 //     public void NameEditAPi()
 //     {
 //         if (NameEditField != null)
@@ -500,7 +500,7 @@
 //                 string jsonResponse = www.downloadHandler.text;
 //                 Debug.Log("withdraw response: " + jsonResponse);
 //                 WithAbleamount withdrwalResponse = JsonUtility.FromJson<WithAbleamount>(jsonResponse);
-                
+
 //                 if (withdrwalResponse.status == 1)
 //                 {
 //                     Withdraw withf = FindObjectOfType<Withdraw>();
@@ -551,7 +551,7 @@
 //                 WithAbleamount[] witharray = JsonHelper.FromJson<WithAbleamount>(jsonResponse);
 //                 if (witharray[0].status == 1)
 //                 {
-                  
+
 //                 }
 //             }
 //         }
@@ -576,7 +576,7 @@
 //                 Level leveda = FindObjectOfType<Level>();
 //                 leveda.levedata(jsonResponse);
 
-               
+
 //             }
 //         }
 //     }
@@ -1013,7 +1013,7 @@
 //                     UserDetail.Bonus = BettingDateArray[0].bonus;
 //                     UserDetail.Wallet = BettingDateArray[0].wallet;
 //                     UserDetail.WinAmount = BettingDateArray[0].winamount;
-                  
+
 //                     UserData ud = FindObjectOfType<UserData>();
 
 //                     ud.WallCha(BettingDateArray[0].wallet, BettingDateArray[0].bonus, BettingDateArray[0].winamount, Wallet.GetPool());

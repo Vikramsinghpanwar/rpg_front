@@ -44,18 +44,17 @@ namespace Teenpatti
         public class RejoinApiResponse
         {
             public string status; // "ACTIVE", "RECONNECTABLE", "SETTLING", "NONE"
+            public string session_id;
+            public string table_id;
             public string ws_url;
             public string ws_token;
-            public string tableID;
         }
 
 
 
         public async Task CreatePrivateRoom(int bootAmount)
         {
-            ProfileImage profileImage = new ProfileImage();
-            profileImage.index = UserDetail.profileImageIndex;
-            profileImage.url = "";
+            String profileImageUrl = BootstrapService.Instance.Profile.avatar;
             var msg = new WSMessage<JoinRequest>
             {
                 type = "createPrivateRoom",
@@ -64,7 +63,7 @@ namespace Teenpatti
                     userID = BootstrapLobbyAdapter.GetUserId(),
                     username = UserDetail.UserName,
                     bootAmount = bootAmount,
-                    profileImage = profileImage,
+                    profileImage = profileImageUrl,
                     chips = (int)BootstrapService.Instance.Wallet.deposit_balance / 100f + (int)BootstrapService.Instance.Wallet.win_balance / 100f,
                     isPrivateCreate = true,
                 }
@@ -75,9 +74,7 @@ namespace Teenpatti
 
         public async Task JoinPrivateRoom(string privateCode)
         {
-            ProfileImage profileImage = new ProfileImage();
-            profileImage.index = UserDetail.profileImageIndex;
-            profileImage.url = "";
+            String profileImageUrl = BootstrapService.Instance.Profile.avatar;
             var msg = new WSMessage<JoinRequest>
             {
                 type = "joinPrivateRoom",
@@ -85,7 +82,7 @@ namespace Teenpatti
                 {
                     userID = BootstrapLobbyAdapter.GetUserId(),
                     username = UserDetail.UserName,
-                    profileImage = profileImage,
+                    profileImage = profileImageUrl,
                     privateCode = privateCode,
                     chips = (int)BootstrapService.Instance.Wallet.deposit_balance / 100f + (int)BootstrapService.Instance.Wallet.win_balance / 100f,
                     isPrivateJoin = true,
@@ -97,9 +94,8 @@ namespace Teenpatti
 
         public async Task JoinGame(int bootAmount, string privateCode = "")
         {
-            ProfileImage profileImage = new ProfileImage();
-            profileImage.index = UserDetail.profileImageIndex;
-            profileImage.url = "";
+            String profileImageUrl = BootstrapService.Instance.Profile.avatar;
+
             var msg = new WSMessage<JoinRequest>
             {
                 type = "join",
@@ -108,7 +104,7 @@ namespace Teenpatti
                     userID = BootstrapLobbyAdapter.GetUserId(),
                     username = UserDetail.UserName,
                     bootAmount = bootAmount,
-                    profileImage = profileImage,
+                    profileImage = profileImageUrl,
                     privateCode = privateCode,
                     chips = privateCode == "" ? (int)BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f : (int)BootstrapService.Instance.Wallet.deposit_balance / 100f + (int)BootstrapService.Instance.Wallet.win_balance / 100f,
                 }
@@ -158,6 +154,7 @@ namespace Teenpatti
 
         public async Task SendAction(string action, int amount = 0, string targetID = null, bool accept = false)
         {
+            Debug.Log($"Sending action: {action}, amount: {amount}, targetID: {targetID}, accept: {accept}");
             var msg = new WSMessage<ActionRequest>
             {
                 type = "action",
@@ -203,6 +200,7 @@ namespace Teenpatti
 
         public async Task LeaveTable()
         {
+            Debug.Log("Sending leave table request to server...");
             var request = new WSMessage<LeaveRequest>
             {
                 type = "leave",
@@ -259,7 +257,7 @@ namespace Teenpatti
             public float chips;
             public bool isPrivateJoin;
             public bool isPrivateCreate;
-            public ProfileImage profileImage;
+            public String profileImage;
         }
 
 

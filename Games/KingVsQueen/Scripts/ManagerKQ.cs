@@ -8,6 +8,8 @@ using TMPro;
 using DG.Tweening;
 using System.Security.Cryptography;
 using System.Text;
+using Core.Utils;
+using Core.Bootstrap;
 
 public class ManagerKQ : MonoBehaviour
 {
@@ -55,7 +57,7 @@ public class ManagerKQ : MonoBehaviour
     public Animator cardAnimator6;
     public GameObject betRoda;
     public Text KingBetAmountText, QueenBetAmountText, tieBetAmountText;
-    public GameObject target1 ,target2;
+    public GameObject target1, target2;
     public GameObject betStopsPanel, betStartPanel;
     public Text timer_text;
     public Image clockVsImg;
@@ -63,6 +65,7 @@ public class ManagerKQ : MonoBehaviour
     public Sprite vsSpr;
     public Text walletText;
     float walletAmount;
+    private bool _resultAnimationComplete;
     public Sprite cardImg, cardImgRed;
     public int p1po, p2po;
     public Image kingCards_1;
@@ -70,7 +73,7 @@ public class ManagerKQ : MonoBehaviour
     public Image kingCards_3;
     public Image queenCard_1;
     public Image queenCard_2;
-    public Image queenCard_3; 
+    public Image queenCard_3;
     public Sprite KingCardDetail, QueenCardDetail;
     public List<Sprite> cardsList;
     public int totalBidAmount;
@@ -81,7 +84,6 @@ public class ManagerKQ : MonoBehaviour
     public bool _StopAmount;
     int k, l, m;
     // public BurstKQ burstScript;
-    APIs apisRef;
     TableBotManager botManagerRef;
     SocketManagerKQ SocketManagerKQRef;
     string gamePhase = "";
@@ -89,31 +91,36 @@ public class ManagerKQ : MonoBehaviour
     {
         SocketManagerKQRef = FindObjectOfType<SocketManagerKQ>();
         botManagerRef = FindObjectOfType<TableBotManager>();
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
         socketManager = FindObjectOfType<SocketManagerKQ>();
         countDownRef = FindObjectOfType<CountDown321>();
         historyGeneratorRef = FindObjectOfType<RandomHistoryKQ>();
         betManagerRef = FindObjectOfType<BetManager>();
         betStartPanel.SetActive(false);
-        // burstScript = FindObjectOfType<BurstKQ>();
         betRoda.SetActive(true);
         insufficientFundsObj.SetActive(false);
-        apisRef.FetchWallet();
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
+
     }
 
-    private void UpdateWallet(float wAmount)
+    public void UpdateWallet(long wAmount)
     {
         walletAmount = wAmount;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
     }
+
+    public void BeginResultProcessing()
+    {
+        _resultAnimationComplete = false;
+    }
+
+    public bool IsResultAnimationComplete => _resultAnimationComplete;
 
     private void OnEnable()
     {
         // deck se cards utha le re baba
         cardsList.Clear();
         Sprite[] cardsObject = Resources.LoadAll<Sprite>("Deck");
-        for(int s = 0; s<cardsObject.Length; s++)
+        for (int s = 0; s < cardsObject.Length; s++)
         {
             cardsList.Add(cardsObject[s]);
         }
@@ -142,7 +149,7 @@ public class ManagerKQ : MonoBehaviour
             PlayerPrefs.SetInt("kq_betsOnKing", 0);
             PlayerPrefs.SetInt("kq_betsOnQueen", 0);
             PlayerPrefs.SetInt("kq_betsOnShot", 0);
-  
+
         }
     }
 
@@ -215,7 +222,7 @@ public class ManagerKQ : MonoBehaviour
             botManagerRef.InitializeBots(data, roundStartTime);
         }
     }
-    
+
     public IEnumerator GameStartEnum(int val, long startTime, string[] seeds)
     {
         waitingForNextRound_Obj.SetActive(false);
@@ -224,7 +231,7 @@ public class ManagerKQ : MonoBehaviour
         qCardList.Clear();
         kCardList.Clear();
         List<int> excludedValues = new List<int>();
-    
+
 
         if (val > 18)
         {
@@ -234,7 +241,7 @@ public class ManagerKQ : MonoBehaviour
             yield return new WaitForSeconds(2f);
             betStartPanel.SetActive(false);
         }
-        
+
         _StopAmount = false;
         isGenerating = true;
         k = l = m = 0;
@@ -248,7 +255,7 @@ public class ManagerKQ : MonoBehaviour
         foreach (Transform child in target1.transform)
         {
             // Destroy the child GameObject
-            if(child.gameObject.tag != "Value")
+            if (child.gameObject.tag != "Value")
             {
                 Destroy(child.gameObject);
 
@@ -272,10 +279,10 @@ public class ManagerKQ : MonoBehaviour
         betNumber = -1;
         betStopsPanel.SetActive(false);
         totalBidAmount = 0;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
 
 
-       
+
         clockVsImg.transform.DOScaleX(0, 0.3f)
            .SetEase(Ease.Linear)
            .OnComplete(() =>
@@ -338,7 +345,7 @@ public class ManagerKQ : MonoBehaviour
 
         // Skip ahead in the random sequences based on elapsed time
         int stepsToSkip = Mathf.FloorToInt(elapsekqimeInSeconds * 2); // 5 steps per second
-        Debug.Log("steps to skip : " + stepsToSkip);    
+        Debug.Log("steps to skip : " + stepsToSkip);
         for (int i = 0; i < stepsToSkip; i++)
         {
             if (rvi < 37)
@@ -387,9 +394,9 @@ public class ManagerKQ : MonoBehaviour
             int l = (randomValue2 * 120);
             int m = (randomValue3 * 20);
 
-            KingBetAmountText.text = $"<color=yellow>{betAmountKing}</color><color=#02ccfe>/{k}</color>";
-            QueenBetAmountText.text = $"<color=yellow>{betAmountQueen}</color><color=#02ccfe>/{l}</color>";
-            tieBetAmountText.text = $"<color=yellow>{betAmountShot}</color><color=#02ccfe>/{m}</color>";
+            KingBetAmountText.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmountKing)}</color><color=#02ccfe>/{k}</color>";
+            QueenBetAmountText.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmountQueen)}</color><color=#02ccfe>/{l}</color>";
+            tieBetAmountText.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmountShot) }</color><color=#02ccfe>/{m}</color>";
 
             yield return new WaitForSeconds(updateInterval);
         }
@@ -409,7 +416,7 @@ public class ManagerKQ : MonoBehaviour
             {
                 countDownRef.Hit((int)remTime);
             }
-        }      
+        }
     }
 
     public void BetCheck()
@@ -420,45 +427,23 @@ public class ManagerKQ : MonoBehaviour
         _StopAmount = true;
     }
 
-    public void ClearAllBets()
-    {
-        if(gamePhase != "Betting")
-        {
-            return;
-        }
-        if(betAmountKing <= 0 && betAmountQueen <= 0 && betAmountShot <= 0) return;
-
-        walletAmount += betAmountKing + betAmountQueen + betAmountShot;
-        walletText.text = "₹" + walletAmount.ToString("F2");
-
-        betAmountKing = betAmountQueen = betAmountShot = 0;
-        m = l = k = 0;
-        PlayerPrefs.SetInt("kq_betsOnShot", betAmountShot);
-        PlayerPrefs.SetInt("kq_betsOnKing", betAmountShot);
-        PlayerPrefs.SetInt("kq_betsOnQueen", betAmountShot);
-
-        socketManager.ClearAllBets();
-        ClearMyCoins();
-
-    }
-
     public List<GameObject> myCoinsList;
     public Transform myCoinHolder;
     Vector3 recentTouchPos;
     void Awake()
     {
-        if(Instance != this)
+        if (Instance != this)
         {
             Instance = this;
         }
-    }    
+    }
     public void RegisterTouch(Vector3 touch)
     {
         recentTouchPos = touch;
     }
     void ClearMyCoins()
     {
-        foreach(GameObject g in myCoinsList)
+        foreach (GameObject g in myCoinsList)
         {
             Destroy(g);
         }
@@ -466,57 +451,59 @@ public class ManagerKQ : MonoBehaviour
     }
 
     void InstantiateCoin()
-    {        
+    {
         GameObject coin = Instantiate(TableBotManager.Instance.coinPrefabList[betManagerRef.betChipNum - 1], myCoinHolder);
         coin.transform.localScale = Vector3.one;
         coin.transform.position = recentTouchPos;
         myCoinsList.Add(coin);
         coin.transform.SetParent(myCoinHolder);
     }
-     
-   
+
+
     public void Bet(int betOn)
     {
-        if(gamePhase != "Betting")
+        if (gamePhase != "Betting")
         {
             return;
         }
-        int val = betManagerRef.betVal;
+        int betValPaisa = betManagerRef.betVal * 100;
         betNumber = 0;
-        if(val <= walletAmount)
+        if (betValPaisa <= walletAmount)
         {
-            walletAmount -= val;
+            walletAmount -= betValPaisa;
             SingleCoinSound.Play();
             PlayerPrefs.SetString("kq_roundId", SocketManagerKQRef.currentRoundId);
             InstantiateCoin();
-            walletText.text = "₹" + walletAmount.ToString("F2");
-            switch (betOn){
+            walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
+            switch (betOn)
+            {
                 case 0:
                     //Shot case
-                    betAmountShot += val;
+                    betAmountShot += betValPaisa;
                     m += betManagerRef.betVal;
                     PlayerPrefs.SetInt("kq_betsOnShot", betAmountShot);
 
                     break;
                 case 1:
-                    betAmountKing += val;
+                    betAmountKing += betValPaisa;
                     k += betManagerRef.betVal;
-                    PlayerPrefs.SetInt("kq_betsOnKing", betAmountShot);
+                    PlayerPrefs.SetInt("kq_betsOnKing", betAmountKing);
 
                     break;
                 case 2:
-                    betAmountQueen += val;
+                    betAmountQueen += betValPaisa;
                     l += betManagerRef.betVal;
-                    PlayerPrefs.SetInt("kq_betsOnQueen", betAmountShot);
+                    PlayerPrefs.SetInt("kq_betsOnQueen", betAmountQueen);
 
                     break;
             }
 
-            totalBidAmount += val;
-            socketManager.SendBetDataToServer(betOn, val);
+            totalBidAmount += betValPaisa;
+            socketManager.SendBetDataToServer(betOn, betValPaisa);
 
         }
-        else { 
+        else
+        {
             insufficientFundsObj.SetActive(true);
         }
 
@@ -525,10 +512,10 @@ public class ManagerKQ : MonoBehaviour
 
 
 
-   
+
     public IEnumerator ShowCardsEnum(List<string> kingCardsList, List<string> queenCardsList, char winner, string kingCardsType, string queenCardsType)
     {
-        int k = Random.Range(0, 1000);  
+        int k = Random.Range(0, 1000);
         yield return new WaitForSeconds(3f);
         cardAnimator1.SetBool("_flip", true);
         cardAnimator2.SetBool("_flip", true);
@@ -560,7 +547,7 @@ public class ManagerKQ : MonoBehaviour
         kingCardqypeTxt.text = kingCardsType;
         queenCardqypeTxt.text = queenCardsType;
         historyGeneratorRef.TrendGenerator(winner);
-        if(winner == 'k')
+        if (winner == 'k')
         {
             StartCoroutine(WinnerDisplay(winner, kingCardsList));
         }
@@ -572,16 +559,16 @@ public class ManagerKQ : MonoBehaviour
 
     Sprite GetCardSpriite(string val)
     {
-        foreach(Sprite s in cardsList)
+        foreach (Sprite s in cardsList)
         {
-            if(s.name == val)
+            if (s.name == val)
             {
                 return s;
             }
         }
         return null;
     }
-   
+
 
     public void WinPanelOff()
     {
@@ -593,14 +580,14 @@ public class ManagerKQ : MonoBehaviour
     int GetCardRank(string cardName)
     {
         string s = cardName.Substring(1);
-    
+
         if (int.TryParse(s, out int res))
         {
             return res;
         }
         else
         {
-            if(s == "a")
+            if (s == "a")
             {
                 return 14;
             }
@@ -639,10 +626,11 @@ public class ManagerKQ : MonoBehaviour
         int r1 = GetCardRank(WinningCardsList[0]);
         int r2 = GetCardRank(WinningCardsList[1]);
         int r3 = GetCardRank(WinningCardsList[2]);
-        if ( r1 == r2 || r1 == r3){
+        if (r1 == r2 || r1 == r3)
+        {
             pairVal = r1;
         }
-        else if(r2 == r3)
+        else if (r2 == r3)
         {
             pairVal = r2;
         }
@@ -652,7 +640,7 @@ public class ManagerKQ : MonoBehaviour
     {
         float winAmount = 0;
         float winMultiplier = 1f;
-        
+
         if (val == 'k')
         {
             string cType = kingCardqypeTxt.text;
@@ -749,19 +737,19 @@ public class ManagerKQ : MonoBehaviour
 
 
         winnerPannel.SetActive(true);
-        if(val == 'k')
+        if (val == 'k')
         {
             winnerText.text = "King Wins";
             // burstScript.Winnerr(0, null);
 
         }
-        else if( val == 'q')
+        else if (val == 'q')
         {
             winnerText.text = "Queen Wins";
             // burstScript.Winnerr(2, null);
 
         }
-        else if(val == 't')
+        else if (val == 't')
         {
             winnerText.text = "Tie";
             // burstScript.Winnerr(1, null);
@@ -769,21 +757,20 @@ public class ManagerKQ : MonoBehaviour
         }
         yield return new WaitForSeconds(2f);
         winnerPannel.SetActive(false);
-ClearMyCoins();
+        ClearMyCoins();
 
 
         yield return new WaitForSeconds(1f);
-        if(winAmount > 0)
+        if (winAmount > 0)
         {
             winAudio.Play();
             winPanel.SetActive(true);
-            winPanelAmntTxt.text = "<size=36>You Win</size>\n₹" + winAmount.ToString("F1");
+            winPanelAmntTxt.text = "<size=36>You Win</size>\n₹" + MoneyFormatter.FormatPaisa((long)winAmount);
             yield return new WaitForSeconds(1.5f);
             winPanel.SetActive(false);
         }
         if (betAmountKing + betAmountQueen + betAmountShot > 0)
         {
-            apisRef.FetchWallet();
         }
 
         yield return new WaitForSeconds(0.5f);
@@ -806,5 +793,7 @@ ClearMyCoins();
         cardAnimator5.SetBool("_flip", false);
         cardAnimator6.SetBool("_flip", false);
         yield return new WaitForSeconds(0.5f);
+
+        _resultAnimationComplete = true;
     }
 }

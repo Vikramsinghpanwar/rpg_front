@@ -4,13 +4,14 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using Features.Lobby.Integration;
+using Core.Bootstrap;
 
 public class BetManagerMines : MonoBehaviour
 {
     // Start is called before the first frame update
     void Start()
     {
-        walletAmt = BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f;
+        walletAmt = BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0;
         BetAmount = 50;
         totalBetAmt = 0;
         DisSelectAllCoins();

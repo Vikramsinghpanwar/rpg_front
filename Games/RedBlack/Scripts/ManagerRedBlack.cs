@@ -7,6 +7,8 @@ using UnityEngine.UI;
 using TMPro;
 using System.Security.Cryptography;
 using System.Text;
+using Core.Utils;
+using Core.Bootstrap;
 
 public class ManagerRedBlack : MonoBehaviour
 {
@@ -110,7 +112,7 @@ public class ManagerRedBlack : MonoBehaviour
         _isAuto = !_isAuto;
     }
 
-   
+
 
     private void Start()
     {
@@ -118,9 +120,6 @@ public class ManagerRedBlack : MonoBehaviour
         apisRef.OnWalletFetched += UpdateWallet;
         socketRef = FindObjectOfType<SocketManagerRVS>();
         waitingPanel.SetActive(false);
-     
-
-
         _isAuto = false;
         insufficientFunds.SetActive(false);
         op = FindObjectOfType<Options>();
@@ -133,7 +132,6 @@ public class ManagerRedBlack : MonoBehaviour
         w7.SetActive(false);
         betAmount = FindObjectOfType<BetAmount>();
         randBet = FindObjectOfType<RandomBoli>();
-
         _canBet = false;
         bet1 = false;
         bet2 = false;
@@ -154,15 +152,14 @@ public class ManagerRedBlack : MonoBehaviour
         startBetPanel.SetActive(false);
         stopBetPanel.SetActive(false);
         chancecount = 24;
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
         apisRef.FetchWallet();
-
-
     }
 
     private void UpdateWallet(float wAmount)
     {
         walletAmount = wAmount;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)(wAmount * 100));
     }
 
     CardDetailRB GetCardObj(string val)
@@ -189,13 +186,13 @@ public class ManagerRedBlack : MonoBehaviour
     {
         val_spadeCount = 0;
         val_heartCount = 0;
-        val_clubCount= 0;
+        val_clubCount = 0;
         val_diamondCount = 0;
         val_redCount = 0;
         val_blackCount = 0;
         val_kCount = 0;
 
-        for(int i = 0; i< hisArray.Length; i++)
+        for (int i = 0; i < hisArray.Length; i++)
         {
             char c = char.Parse(hisArray[i].Substring(0, 1));
             switch (c)
@@ -244,7 +241,7 @@ public class ManagerRedBlack : MonoBehaviour
             cardImagesList[i].sprite = visibleCard.cardImgL;
         }
         int k = 24;
-        if(hisArray.Length < 24)
+        if (hisArray.Length < 24)
         {
             k = hisArray.Length;
         }
@@ -443,7 +440,7 @@ public class ManagerRedBlack : MonoBehaviour
             int l1 = (randomValue2 * 10);
             int m1 = (randomValue3 * 10);
             int n1 = (randomValue1 * 10);
-            int o1 = ((int)(randomValue2/5) * 10);
+            int o1 = ((int)(randomValue2 / 5) * 10);
             int p1 = (randomValue3 * 30);
             int q1 = (randomValue3 * 30);
 
@@ -655,8 +652,8 @@ public class ManagerRedBlack : MonoBehaviour
             {
                 betOnSpade += betAmount.amount;
                 walletAmount -= betAmount.amount;
-                walletText.text = walletAmount.ToString("F2");
-                spadeBetText.text = betOnSpade.ToString();
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
+                spadeBetText.text = MoneyFormatter.FormatPaisa(betOnSpade);
                 totalBets += betAmount.amount;
                 if (!_isClicked)
                 {
@@ -685,8 +682,8 @@ public class ManagerRedBlack : MonoBehaviour
             {
                 betOnClub += betAmount.amount;
                 walletAmount -= betAmount.amount;
-                walletText.text = walletAmount.ToString("F2");
-                clubBetText.text = betOnClub.ToString();
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
+                clubBetText.text = MoneyFormatter.FormatPaisa(betOnClub);
                 totalBets += betAmount.amount;
                 if (!_isClicked)
                 {
@@ -716,8 +713,8 @@ public class ManagerRedBlack : MonoBehaviour
             {
                 betOnHeart += betAmount.amount;
                 walletAmount -= betAmount.amount;
-                walletText.text = walletAmount.ToString("F2");
-                heartBetText.text = betOnHeart.ToString();
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
+                heartBetText.text = MoneyFormatter.FormatPaisa(betOnHeart);
                 totalBets += betAmount.amount;
                 if (!_isClicked)
                 {
@@ -749,8 +746,8 @@ public class ManagerRedBlack : MonoBehaviour
             {
                 betOnDiamond += betAmount.amount;
                 walletAmount -= betAmount.amount;
-                walletText.text = walletAmount.ToString("F2");
-                diamondBetText.text = betOnDiamond.ToString();
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
+                diamondBetText.text = MoneyFormatter.FormatPaisa(betOnDiamond);
                 totalBets += betAmount.amount;
                 if (!_isClicked)
                 {
@@ -781,8 +778,8 @@ public class ManagerRedBlack : MonoBehaviour
             {
                 betOnKing += betAmount.amount;
                 walletAmount -= betAmount.amount;
-                walletText.text = walletAmount.ToString("F2");
-                kingBetText.text = betOnKing.ToString();
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
+                kingBetText.text = MoneyFormatter.FormatPaisa(betOnKing);
                 totalBets += betAmount.amount;
                 if (!_isClicked)
                 {
@@ -812,8 +809,8 @@ public class ManagerRedBlack : MonoBehaviour
             {
                 betOnRed += betAmount.amount;
                 walletAmount -= betAmount.amount;
-                walletText.text = walletAmount.ToString("F2");
-                redBetText.text = betOnRed.ToString();
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
+                redBetText.text = MoneyFormatter.FormatPaisa(betOnRed);
                 totalBets += betAmount.amount;
                 if (!_isClicked)
                 {
@@ -843,8 +840,8 @@ public class ManagerRedBlack : MonoBehaviour
             {
                 betOnBlack += betAmount.amount;
                 walletAmount -= betAmount.amount;
-                walletText.text = walletAmount.ToString("F2");
-                blackBetText.text = betOnBlack.ToString();
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
+                blackBetText.text = MoneyFormatter.FormatPaisa(betOnBlack);
                 totalBets += betAmount.amount;
                 if (!_isClicked)
                 {
@@ -926,7 +923,7 @@ public class ManagerRedBlack : MonoBehaviour
 
                 totalWinnings += betPercentBlack * betOnBlack;
                 walletAmount += betPercentBlack * betOnBlack;
-                walletText.text = walletAmount.ToString("F2");
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
             }
         }
 
@@ -936,7 +933,7 @@ public class ManagerRedBlack : MonoBehaviour
             {
                 totalWinnings += betPercentRed * betOnRed;
                 walletAmount += betPercentRed * betOnRed;
-                walletText.text = walletAmount.ToString("F2");
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
             }
         }
 
@@ -948,7 +945,7 @@ public class ManagerRedBlack : MonoBehaviour
             {
                 totalWinnings += betPercentClub * betOnClub;
                 walletAmount += betPercentClub * betOnClub;
-                walletText.text = walletAmount.ToString("F2");
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
             }
         }
 
@@ -958,7 +955,7 @@ public class ManagerRedBlack : MonoBehaviour
             {
                 totalWinnings += betPercentSpade * betOnSpade;
                 walletAmount += betPercentSpade * betOnSpade;
-                walletText.text = walletAmount.ToString("F2");
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
             }
         }
 
@@ -968,7 +965,7 @@ public class ManagerRedBlack : MonoBehaviour
             {
                 totalWinnings += betPercentHeart * betOnHeart;
                 walletAmount += betPercentHeart * betOnHeart;
-                walletText.text = walletAmount.ToString("F2");
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
             }
         }
 
@@ -978,7 +975,7 @@ public class ManagerRedBlack : MonoBehaviour
             {
                 totalWinnings += betPercentDiamond * betOnDiamond;
                 walletAmount += betPercentDiamond * betOnDiamond;
-                walletText.text = walletAmount.ToString("F2");
+                walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
             }
         }
 
@@ -987,7 +984,7 @@ public class ManagerRedBlack : MonoBehaviour
             winPanel.SetActive(true);
             Invoke("DeactivateWinPanel", 2);
             winAudio.Play();
-            winAmountTxt.text = "₹ " + totalWinnings.ToString("F2");
+            winAmountTxt.text = MoneyFormatter.FormatPaisa((long)(totalWinnings * 100));
         }
 
     }

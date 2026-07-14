@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using TMPro;
+using Core.Utils;
 
 public class ReferralItem : MonoBehaviour
 {
@@ -14,7 +15,7 @@ public class ReferralItem : MonoBehaviour
         snoText.text = index.ToString();
         playerIdText.text = playerId;
         levelText.text = "Level " + level;
-        amountText.text = "₹" + amount.ToString("0.##");
+        amountText.text = MoneyFormatter.FormatPaisa((long)(amount * 100));
         dateText.text = dateTime;
     }
 }

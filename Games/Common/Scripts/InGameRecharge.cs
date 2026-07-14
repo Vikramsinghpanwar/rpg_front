@@ -1,12 +1,19 @@
-﻿using System.Collections;
+using System;
 using System.Collections.Generic;
-using System.Net.Http;
+using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Networking;
 using UnityEngine.UI;
 using TMPro;
-using Core.Config;
+using Core.Bootstrap;
+using Core.Managers;
+using Core.Models;
+using Core.Utils;
 using Features.Lobby.Integration;
+using Features.Recharge.Controllers;
+using Features.Recharge.Models;
+using Features.Recharge.Utils;
+using Features.Recharge.UI;
 
 public class InGameRecharge : MonoBehaviour
 {
@@ -16,13 +23,34 @@ public class InGameRecharge : MonoBehaviour
     public TextMeshProUGUI bonusTMP;
     public Text walletTxt;
     int rechargeAmount;
-    int bonusAmount = 100;//fixed isko variable krna h
+    int bonusAmount;
     public Text rechargeAmountTxt;
     public Text managerWalletTxt;
     public Transform rechargeBtns_Parent;
     public GameObject amountBtnPrefab;
     ScreenOrientation gameOrientation;
     GameObject rechargePanel;
+    public Button[] allRechargeBtn_Array;
+    public Color primaryColor;
+
+    [Header("Custom Amount")]
+    public TMP_InputField customAmountInput;
+
+    [Header("Gateway Selection")]
+    public Transform gatewayContainer;
+    public GameObject gatewayBtnPrefab;
+
+    private RechargeController controller;
+    private RechargeAmountPreset selectedPreset;
+    private readonly List<Button> presetButtons = new List<Button>();
+    private int activeRechargeBtn;
+    private bool isLoading;
+    private long customAmountPaisa;
+    private long customBonusPaisa;
+    private bool _suppressCustomAmountEvent;
+    private GatewayInfo selectedGateway;
+    private readonly List<RechargeGatewayButton> gatewayButtons = new List<RechargeGatewayButton>();
+
     private void Awake()
     {
         if (instance == null)
@@ -33,11 +61,10 @@ public class InGameRecharge : MonoBehaviour
         else
         {
             Destroy(gameObject);
-            return;
         }
     }
 
-    void OnEnable()
+    private void OnEnable()
     {
         if (managerWalletTxt != null)
         {
@@ -51,237 +78,417 @@ public class InGameRecharge : MonoBehaviour
 
     private void Start()
     {
-        rechargePanel = transform.GetChild(0).gameObject;
-        ArrangeData();
-    }
+        if (rechargePanel == null)
+            rechargePanel = transform.GetChild(0).gameObject;
+        rechargePanel.SetActive(false);
 
-    public Button[] allRechargeBtn_Array;
-    void ArrangeData()
-    {
-        allRechargeBtn_Array = new Button[UserDetail.rechargeData.Length];
-        for (int i = 0; i < UserDetail.rechargeData.Length; i++)
+        controller = GetComponent<RechargeController>();
+        if (controller == null)
+            controller = gameObject.AddComponent<RechargeController>();
+
+        if (customAmountInput != null)
         {
-            GameObject g = Instantiate(amountBtnPrefab, rechargeBtns_Parent);
-            int index = i;
-            g.transform.GetChild(0).GetComponent<Text>().text = "₹" + UserDetail.rechargeData[i].amount;
-            Button b = g.GetComponent<Button>();
-            allRechargeBtn_Array[i] = b;
-            g.transform.GetChild(1).GetChild(0).GetComponent<Text>().text = "₹" + UserDetail.rechargeData[i].bonus;
-            b.onClick.AddListener(() => SelectRechargeAmount(UserDetail.rechargeData[index].amount, UserDetail.rechargeData[index].bonus, index));
+            customAmountInput.contentType = TMP_InputField.ContentType.IntegerNumber;
+            customAmountInput.onValueChanged.AddListener(OnCustomAmountChanged);
         }
-        transform.GetChild(0).gameObject.SetActive(false);
-        SelectRechargeAmount(UserDetail.rechargeData[0].amount, UserDetail.rechargeData[0].bonus, 0);
-
     }
-    int activeRechargeBtn = 0;
-    public Color primaryColor;
-    public void SelectRechargeAmount(int val, int bonus, int index)
-    {
-        allRechargeBtn_Array[activeRechargeBtn].transform.GetChild(0).GetComponent<Text>().color = Color.black;
-        allRechargeBtn_Array[activeRechargeBtn].image.color = Color.white;
 
-        activeRechargeBtn = index;
-        allRechargeBtn_Array[index].transform.GetChild(0).GetComponent<Text>().color = Color.white;
-        allRechargeBtn_Array[index].image.color = primaryColor;
-        rechargeAmount = val;
-        rechargeAmountTxt.text = "Add Cash ₹" + val;
-        totalGetTMP.text = "₹" + (val + bonus);
-        cashTMP.text = "₹" + val;
-        bonusTMP.text = "₹" + bonus;
+    private void OnDestroy()
+    {
+        Unsubscribe();
+        if (customAmountInput != null)
+            customAmountInput.onValueChanged.RemoveListener(OnCustomAmountChanged);
+    }
+
+    private void Subscribe()
+    {
+        if (controller != null)
+        {
+            controller.OnAmountsLoaded += OnAmountsLoaded;
+            controller.OnGatewaysLoaded += OnGatewaysLoaded;
+            controller.OnRechargeCreated += OnRechargeCreated;
+            controller.OnError += OnRechargeError;
+        }
+        if (BootstrapService.Instance != null)
+            BootstrapService.Instance.OnBootstrapUpdated += OnBootstrapUpdated;
+    }
+
+    private void Unsubscribe()
+    {
+        if (controller != null)
+        {
+            controller.OnAmountsLoaded -= OnAmountsLoaded;
+            controller.OnGatewaysLoaded -= OnGatewaysLoaded;
+            controller.OnRechargeCreated -= OnRechargeCreated;
+            controller.OnError -= OnRechargeError;
+        }
+        if (BootstrapService.Instance != null)
+            BootstrapService.Instance.OnBootstrapUpdated -= OnBootstrapUpdated;
     }
 
     public void OpenPanel()
     {
         gameOrientation = Screen.orientation;
         Screen.orientation = ScreenOrientation.LandscapeLeft;
+        if (rechargePanel == null)
+            rechargePanel = transform.GetChild(0).gameObject;
         rechargePanel.SetActive(true);
+
+        Subscribe();
+        RefreshAndRender();
     }
 
     public void ClosePanel()
     {
-        rechargePanel.SetActive(false);
+        if (rechargePanel != null)
+            rechargePanel.SetActive(false);
         Screen.orientation = gameOrientation;
+        Unsubscribe();
+        ClearGateways();
     }
 
     public void BuyCoin()
     {
-        string mobilee = PlayerPrefs.GetString("mobile");
-        int amount = rechargeAmount;
-        int bonus = bonusAmount;
-        string token = UserDetail.Token;
-        rechargePanel.SetActive(false);
-        Debug.Log("gateway: " + UserDetail.gateway3 + " gateway2: " + UserDetail.gateway4);
-        if (UserDetail.gateway3 == 1)
-            StartCoroutine(BuyCoinCoroutine(amount, bonus, token, mobilee));
-        else if (UserDetail.gateway4 == 1)
-            StartCoroutine(BuyCoinGateway2Coroutine(amount, bonus, mobilee, token));
-    }
-
-    [System.Serializable]
-    public class RootResponse
-    {
-        public bool status;
-        public string message;
-        public string redirect_url;
-        public Data data;
-    }
-
-    [System.Serializable]
-    public class Data
-    {
-        public bool status;
-        public string message;
-        public ResultN result;
-    }
-
-    [System.Serializable]
-    public class ResultN
-    {
-        public string orderId;
-        public string payment_url;
-    }
-
-
-    public IEnumerator BuyCoinGateway2Coroutine(int amount, int bonus, string mobile, string token)
-    {
-        string url = "https://thecrownempire.live/paytm/create.php";
-
-        WWWForm form = new WWWForm();
-        form.AddField("amount", amount);
-        form.AddField("token", token);
-
-        using (UnityWebRequest www = UnityWebRequest.Post(url, form))
+        if (isLoading) return;
+        if (selectedPreset == null && customAmountPaisa <= 0)
         {
-            yield return www.SendWebRequest();
+            PopupManager.Instance?.ShowError("Please select an amount first");
+            return;
+        }
+        _ = PayNowAsync();
+    }
 
-            if (www.result == UnityWebRequest.Result.Success && www.responseCode == 200)
+    private async Task PayNowAsync()
+    {
+        if (controller == null)
+        {
+            PopupManager.Instance?.ShowError("Payment system unavailable. Please try again later.");
+            return;
+        }
+
+        var gateways = controller.GetGateways();
+        var filteredGateways = gateways != null 
+            ? gateways.Where(g => g.status == "active" && g.enabled_ingame).ToList() 
+            : new List<GatewayInfo>();
+
+        if (filteredGateways.Count == 0)
+        {
+            PopupManager.Instance?.ShowError("No payment methods available for in-game deposits. Please try again.");
+            return;
+        }
+
+        // Verify that selectedGateway is valid and in the filtered list
+        if (selectedGateway == null || !filteredGateways.Any(g => g.id == selectedGateway.id))
+        {
+            selectedGateway = filteredGateways[0];
+        }
+
+        isLoading = true;
+        LoadingManager.Instance?.Show("Creating order...");
+
+        try
+        {
+            long amountPaisa = selectedPreset != null ? selectedPreset.amount_paisa : customAmountPaisa;
+            Debug.Log($"[PaymentGateway] Initiating recharge using selected gateway - id: {selectedGateway.id}, enabled_ingame: {selectedGateway.enabled_ingame}, amount: {amountPaisa}");
+            string checkoutUrl = await controller.CreateRecharge(amountPaisa, selectedGateway.id);
+            if (!string.IsNullOrEmpty(checkoutUrl))
             {
-                string jsonResponse = www.downloadHandler.text;
-                Debug.Log("gateway response: " + jsonResponse);
-
-                RootResponse response = JsonUtility.FromJson<RootResponse>(jsonResponse);
-
-                if (response != null &&
-                    response.data != null &&
-                    response.data.result != null)
-                {
-                    string paymentUrl = response.data.result.payment_url;
-
-                    Debug.Log("Payment URL: " + paymentUrl);
-
-                    if (!string.IsNullOrEmpty(paymentUrl))
-                    {
-                        Application.OpenURL(paymentUrl);
-                    }
-                    else
-                    {
-                        Debug.LogError("Payment URL is null or empty");
-                    }
-                }
-                else
-                {
-                    Debug.LogError("Invalid JSON structure");
-                }
+                Application.OpenURL(checkoutUrl);
+                ClosePanel();
             }
             else
             {
-                Debug.LogError("Failed to fetch the gateway");
+                PopupManager.Instance?.ShowError("Failed to create recharge. Please try again.");
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"InGameRecharge.PayNow failed: {e.Message}");
+            PopupManager.Instance?.ShowError("Something went wrong. Please try again.");
+        }
+        finally
+        {
+            isLoading = false;
+            LoadingManager.Instance?.Hide();
+        }
+    }
+
+    private void RefreshAndRender()
+    {
+        if (controller == null) return;
+        controller.GetDefaultAmounts();
+        LoadPresetsUI();
+
+        // Always force load / refresh gateways for ingame source
+        _ = RefreshGatewaysAsync();
+    }
+
+    private async Task RefreshGatewaysAsync()
+    {
+        if (controller == null) return;
+        try
+        {
+            // Call LoadGateways with source = "ingame" and silent = false to block interaction via LoadingManager
+            await controller.LoadGateways("ingame", silent: false);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[PaymentGateway] RefreshGatewaysAsync failed: {e.Message}");
+        }
+    }
+
+    private void OnAmountsLoaded(List<RechargeAmountPreset> amounts)
+    {
+        if (rechargePanel != null && rechargePanel.activeSelf)
+            LoadPresetsUI();
+    }
+
+    private void OnGatewaysLoaded(List<GatewayInfo> gateways)
+    {
+        PopulateGatewaysUI(gateways);
+    }
+
+    private void PopulateGatewaysUI(List<GatewayInfo> gateways)
+    {
+        ClearGateways();
+
+        if (gatewayContainer == null || gatewayBtnPrefab == null)
+        {
+            // If there's no UI for gateway selection, we still filter them and choose the default.
+            var filtered = gateways != null 
+                ? gateways.Where(g => g.status == "active" && g.enabled_ingame).ToList() 
+                : new List<GatewayInfo>();
+
+            Debug.Log("[PaymentGateway] Filtering In-Game gateways (UI containers not assigned)...");
+            foreach (var gw in filtered)
+            {
+                Debug.Log($"[PaymentGateway] Filtered InGame Gateway - id: {gw.id}, enabled_lobby: {gw.enabled_lobby}, enabled_ingame: {gw.enabled_ingame}");
+            }
+
+            if (filtered.Count > 0)
+            {
+                if (selectedGateway == null || !filtered.Any(g => g.id == selectedGateway.id))
+                {
+                    SelectGateway(filtered[0]);
+                }
+            }
+            return;
+        }
+
+        var filteredGateways = gateways != null 
+            ? gateways.Where(g => g.status == "active" && g.enabled_ingame).ToList() 
+            : new List<GatewayInfo>();
+
+        Debug.Log("[PaymentGateway] Filtering In-Game gateways...");
+        foreach (var gw in filteredGateways)
+        {
+            Debug.Log($"[PaymentGateway] Filtered InGame Gateway - id: {gw.id}, enabled_lobby: {gw.enabled_lobby}, enabled_ingame: {gw.enabled_ingame}");
+        }
+
+        int gatewayCounter = 0;
+        foreach (var gateway in filteredGateways)
+        {
+            gatewayCounter++;
+            var go = Instantiate(gatewayBtnPrefab, gatewayContainer);
+            var btn = go.GetComponent<RechargeGatewayButton>();
+            if (btn == null) btn = go.AddComponent<RechargeGatewayButton>();
+            btn.Setup(gateway, OnGatewayClicked, gatewayCounter);
+            gatewayButtons.Add(btn);
+        }
+
+        // Selection restoration and fallback logic
+        if (selectedGateway != null)
+        {
+            var match = filteredGateways.FirstOrDefault(g => g.id == selectedGateway.id);
+            if (match != null)
+            {
+                SelectGateway(match);
+            }
+            else
+            {
+                selectedGateway = null;
+            }
+        }
+
+        if (selectedGateway == null && filteredGateways.Count > 0)
+        {
+            SelectGateway(filteredGateways[0]);
+        }
+    }
+
+    private void OnGatewayClicked(GatewayInfo gateway)
+    {
+        SelectGateway(gateway);
+    }
+
+    private void SelectGateway(GatewayInfo gateway)
+    {
+        selectedGateway = gateway;
+        string sourceInfo = controller != null ? $"cache source: {controller.LoadedSource}" : "unknown cache";
+        Debug.Log($"[PaymentGateway] Selected gateway in In-Game: {gateway?.id} ({sourceInfo})");
+
+        foreach (var btn in gatewayButtons)
+        {
+            if (btn != null)
+            {
+                btn.SetSelected(btn.Gateway?.id == gateway?.id);
             }
         }
     }
 
-
-    IEnumerator BuyCoinCoroutine(int amount, int bonus, string token, string mobilee)
+    private void ClearGateways()
     {
-        string url = ServerConfig.GatewayUrl + $"?token={token}&amount={amount}&bonus={bonus}&mobile={mobilee}";
-        Application.OpenURL(url);
-
-        yield return new WaitForSeconds(1);
+        foreach (var btn in gatewayButtons)
+        {
+            if (btn != null) Destroy(btn.gameObject);
+        }
+        gatewayButtons.Clear();
+        selectedGateway = null;
     }
 
-    private long orderId;
-    private readonly string apiUrl = "https://pay.imb.org.in/api/create-order";
-    private readonly string apiUrlCheck = "https://pay.imb.org.in/api/check-order-status";
-    private readonly string userToken = "df60a257148c72bf516ef3a988889fcd";
-    private readonly string remark1 = "aberf@gmail.com";
-    private readonly string remark2 = "any data";
-    private bool isOrderComplete = false;
-    private float checkInterval = 5f; // Time interval in seconds
-    private float totalDuration = 600f;
-    private float amount;
-
-    public async void CreateOrder(float amount, string mobile)
+    private void OnRechargeCreated(CreateRechargeResponse response)
     {
-        orderId = GenerateRandomOrderId();
-        var formData = new MultipartFormDataContent
+    }
+
+    private void OnRechargeError(string code, string message)
+    {
+        PopupManager.Instance?.ShowError(message);
+    }
+
+    private void OnBootstrapUpdated(BootstrapResponse resp)
+    {
+        if (rechargePanel != null && rechargePanel.activeSelf)
+            RefreshAndRender();
+    }
+
+    private void OnCustomAmountChanged(string value)
+    {
+        if (_suppressCustomAmountEvent) return;
+
+        string cleaned = value?.Replace(",", "") ?? "";
+        if (long.TryParse(cleaned, out long rupees) && rupees > 0)
         {
-            { new StringContent(mobile), "customer_mobile" },
-            { new StringContent(userToken), "user_token" },
-            { new StringContent(amount.ToString()), "amount" },
-            { new StringContent(orderId.ToString()), "order_id" },
-            { new StringContent(ServerConfig.GatewayUrl + "/callbacki.php"), "redirect_url" },
-            { new StringContent(remark1), "remark1" },
-            { new StringContent(remark2), "remark2" }
-        };
-        using (HttpClient client = new HttpClient())
+            customAmountPaisa = rupees * 100;
+        }
+        else
         {
-            HttpResponseMessage response = await client.PostAsync(apiUrl, formData);
-            string responseContent = await response.Content.ReadAsStringAsync();
+            customAmountPaisa = 0;
+        }
 
-            // Parse the JSON response
-            if (response.IsSuccessStatusCode)
+        selectedPreset = null;
+        if (presetButtons.Count > 0 && activeRechargeBtn < presetButtons.Count && presetButtons[activeRechargeBtn] != null)
+        {
+            var oldBtn = presetButtons[activeRechargeBtn];
+            var oldText = oldBtn.transform.GetChild(0).GetComponent<Text>();
+            if (oldText != null) oldText.color = Color.black;
+            oldBtn.image.color = Color.white;
+        }
+
+        var presets = controller != null ? controller.GetDefaultAmounts() : null;
+        customBonusPaisa = Features.Recharge.Utils.RechargeBonusCalculator.GetApplicableBonus(customAmountPaisa, presets);
+
+        int customRupees = (int)(customAmountPaisa / 100);
+        int bonusRupees = (int)(customBonusPaisa / 100);
+
+        rechargeAmountTxt.text = customAmountPaisa > 0 ? "Add Cash ₹" + customRupees : "";
+        totalGetTMP.text = customAmountPaisa > 0 ? "₹" + (customRupees + bonusRupees) : "";
+        cashTMP.text = customAmountPaisa > 0 ? "₹" + customRupees : "";
+        bonusTMP.text = (customAmountPaisa > 0 && customBonusPaisa > 0) ? "₹" + bonusRupees : "";
+    }
+
+    private void LoadPresetsUI()
+    {
+        ClearPresets();
+        if (rechargeBtns_Parent == null || amountBtnPrefab == null) return;
+
+        var presets = controller != null ? controller.GetDefaultAmounts() : null;
+        if (presets == null || presets.Count == 0)
+        {
+            PopupManager.Instance?.ShowError("Recharge presets unavailable. Please try again later.");
+            return;
+        }
+
+        allRechargeBtn_Array = new Button[presets.Count];
+
+        for (int i = 0; i < presets.Count; i++)
+        {
+            var preset = presets[i];
+            int amountRupees = (int)(preset.amount_paisa / 100);
+            int bonusRupees = (int)(preset.bonus_amount_paisa / 100);
+
+            var g = Instantiate(amountBtnPrefab, rechargeBtns_Parent);
+            int idx = i;
+            Button b = g.GetComponent<Button>();
+            presetButtons.Add(b);
+            allRechargeBtn_Array[i] = b;
+
+            Text amountTextChild = g.transform.GetChild(0).GetComponent<Text>();
+            if (amountTextChild != null) amountTextChild.text = "₹" + amountRupees;
+
+            Transform bonusContainer = g.transform.GetChild(1);
+            if (bonusContainer != null && bonusContainer.childCount > 0)
             {
-                try
-                {
-                    var jsonResponse = JsonUtility.FromJson<ApiResponse>(responseContent);
-
-                    if (!string.IsNullOrEmpty(jsonResponse.result.payment_url))
-                    {
-                        isOrderComplete = false;
-                        string paymentUrl = jsonResponse.result.payment_url;
-                        Debug.Log("Payment URL: " + paymentUrl);
-
-                        // Redirect to payment URL
-                        Application.OpenURL(paymentUrl);
-                    }
-                    else
-                    {
-                        Debug.LogError("Payment URL not found in response.");
-                    }
-                }
-                catch (System.Exception e)
-                {
-                    Debug.LogError("Error parsing JSON response: " + e.Message);
-                }
+                Text bonusTextChild = bonusContainer.GetChild(0).GetComponent<Text>();
+                if (bonusTextChild != null) bonusTextChild.text = "₹" + bonusRupees;
             }
-            else
-            {
-                Debug.LogError("Request failed: " + response.StatusCode);
-            }
+
+            b.onClick.AddListener(() => SelectRechargeAmount(amountRupees, bonusRupees, idx));
+        }
+
+        if (presetButtons.Count > 0 && selectedPreset == null && customAmountPaisa == 0)
+        {
+            var first = presets[0];
+            SelectRechargeAmount((int)(first.amount_paisa / 100), (int)(first.bonus_amount_paisa / 100), 0);
         }
     }
 
-
-    private long GenerateRandomOrderId()
+    public void SelectRechargeAmount(int val, int bonus, int index)
     {
-        System.Random random = new System.Random();
-        return random.Next(1000000000, 1999999999); // Adjusted for Unity-compatible random
+        if (presetButtons.Count == 0 || index < 0 || index >= presetButtons.Count) return;
+
+        if (customAmountInput != null)
+        {
+            _suppressCustomAmountEvent = true;
+            customAmountInput.text = "";
+            _suppressCustomAmountEvent = false;
+        }
+        customAmountPaisa = 0;
+        customBonusPaisa = 0;
+
+        if (activeRechargeBtn < presetButtons.Count && presetButtons[activeRechargeBtn] != null)
+        {
+            var oldBtn = presetButtons[activeRechargeBtn];
+            oldBtn.transform.GetChild(0).GetComponent<Text>().color = Color.black;
+            oldBtn.image.color = Color.white;
+        }
+
+        activeRechargeBtn = index;
+        var newBtn = presetButtons[index];
+        newBtn.transform.GetChild(0).GetComponent<Text>().color = Color.white;
+        newBtn.image.color = primaryColor;
+
+        rechargeAmount = val;
+        bonusAmount = bonus;
+        rechargeAmountTxt.text = "Add Cash ₹" + val;
+        totalGetTMP.text = "₹" + (val + bonus);
+        cashTMP.text = "₹" + val;
+        bonusTMP.text = "₹" + bonus;
+
+        var presets = controller != null ? controller.GetDefaultAmounts() : null;
+        if (presets != null && index < presets.Count)
+            selectedPreset = presets[index];
+        else
+            selectedPreset = new RechargeAmountPreset(val * 100L);
     }
 
-    [System.Serializable]
-    private class ApiResponse
+    private void ClearPresets()
     {
-        public Result result;
-        public int status;
-        public string message;
-    }
-
-    [System.Serializable]
-    private class Result
-    {
-        public string payment_url;
-        public string status;
-        public int orderId;
-        public string txnStatus;
+        foreach (var btn in presetButtons)
+        {
+            if (btn != null) Destroy(btn.gameObject);
+        }
+        presetButtons.Clear();
+        selectedPreset = null;
+        activeRechargeBtn = 0;
     }
 }

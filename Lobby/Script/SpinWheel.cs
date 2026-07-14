@@ -104,8 +104,6 @@ public class SpinWheel : MonoBehaviour
                 spinSound.Play();
                 rbody.AddTorque(RotatePower);
                 inRotate = 1;
-                Betting Bett = FindObjectOfType<Betting>();
-                Bett.BettingAMount(BettAmount);
             }
         }
         else
@@ -186,8 +184,6 @@ public class SpinWheel : MonoBehaviour
         {
             print("Error" + Score);
         }
-        Betting Bett = FindObjectOfType<Betting>();
-        Bett.BeetingResult(BettingResult);
     }
 
 

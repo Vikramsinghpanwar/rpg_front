@@ -8,7 +8,8 @@ namespace Core.API.Endpoints
         public static readonly string DailyStatus  = $"{Base}/daily/status";
         public static readonly string DailyClaim   = $"{Base}/daily/claim";
 
-        public static readonly string ReferralMe   = $"{Base}/referrals/me";
-        public static readonly string ReferralBind = $"{Base}/referrals/bind";
+        public static readonly string RewardHistory = $"{Base}/reward-history";
+        public static readonly string ReferralMe    = $"{Base}/referrals/me";
+        public static readonly string ReferralBind  = $"{Base}/referrals/bind";
     }
 }

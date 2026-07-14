@@ -9,13 +9,13 @@ using Features.Lobby.Integration;
 public class PlayGame : MonoBehaviour
 {
     private float Balance;
-    GameActive gameActiveRef;
+    // GameActive gameActiveRef;
     public Error errorRef;
 
     void Start()
     {
         errorRef = FindObjectOfType<Error>();
-        gameActiveRef = FindObjectOfType<GameActive>();
+        // gameActiveRef = FindObjectOfType<GameActive>();
         Balance = BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f;
 
     }

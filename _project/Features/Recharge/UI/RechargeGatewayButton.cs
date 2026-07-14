@@ -12,8 +12,8 @@ namespace Features.Recharge.UI
     {
         [SerializeField] private TMP_Text nameText;
         [SerializeField] private Image background;
-        [SerializeField] private Color normalColor = new Color(0.2f, 0.2f, 0.3f);
-        [SerializeField] private Color selectedColor = new Color(0.3f, 0.5f, 0.8f);
+        [SerializeField] private Sprite selectedSprite;
+        [SerializeField] private Sprite unSelectedSprite;
 
         public GatewayInfo Gateway { get; private set; }
 
@@ -29,17 +29,17 @@ namespace Features.Recharge.UI
             button.onClick.AddListener(() => onClick?.Invoke(Gateway));
         }
 
-        public void Setup(GatewayInfo gateway, Action<GatewayInfo> clickHandler)
+        public void Setup(GatewayInfo gateway, Action<GatewayInfo> clickHandler, int gatewayCounter)
         {
             Gateway = gateway;
             onClick = clickHandler;
-            if (nameText != null) nameText.text = gateway?.name ?? gateway?.id ?? "";
+            if (nameText != null) nameText.text = "Gateway-" + gatewayCounter;//gateway?.name ?? gateway?.id ?? "";
             SetSelected(false);
         }
 
         public void SetSelected(bool selected)
         {
-            if (background != null) background.color = selected ? selectedColor : normalColor;
+            if (background != null) background.sprite = selected ? selectedSprite : unSelectedSprite;
         }
     }
 }

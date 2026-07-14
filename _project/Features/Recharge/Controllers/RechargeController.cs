@@ -2,44 +2,71 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
-using Features.Recharge.Models;
 using Core.API;
 using Core.API.Endpoints;
+using Core.Bootstrap;
 using Core.Managers;
+using Core.Models;
 using Core.Utils;
+using Features.Recharge.Models;
+using UnityEngine.SceneManagement;
 
 namespace Features.Recharge.Controllers
 {
     public class RechargeController : MonoBehaviour
     {
         [Header("Config")]
-        [SerializeField] private string[] defaultAmounts = { "100", "200", "500", "1000", "2000", "5000" };
         [SerializeField] private int historyRefreshCooldownSeconds = 3;
+        [SerializeField] private int historyPageSize = 20;
+
+        public long MinRechargeAmount => BootstrapService.Instance.WalletConfig?.minRechargeAmount * 100 ?? 0;
+
+        public int CurrentHistoryPage { get; private set; } = 1;
+        public int TotalHistoryPages { get; private set; } = 1;
+        public bool HasMoreHistory { get; private set; }
 
         public event Action<List<GatewayInfo>> OnGatewaysLoaded;
         public event Action<List<RechargeAmountPreset>> OnAmountsLoaded;
         public event Action<CreateRechargeResponse> OnRechargeCreated;
         public event Action<List<RechargeRecord>> OnHistoryLoaded;
         public event Action<string, string> OnError;
+        public event Action<int, int> OnPaginationChanged;
 
         readonly List<GatewayInfo> cachedGateways = new List<GatewayInfo>();
         readonly List<RechargeAmountPreset> cachedAmounts = new List<RechargeAmountPreset>();
-        List<RechargeRecord> cachedHistory = new List<RechargeRecord>();
-        DateTime lastHistoryFetchTime = DateTime.MinValue;
+        readonly List<RechargeRecord> cachedHistory = new List<RechargeRecord>();
         bool isLoadingHistory;
+
+        public string LoadedSource { get; private set; }
 
         public List<GatewayInfo> GetGateways() => cachedGateways;
         public List<RechargeRecord> GetCachedHistory() => cachedHistory;
 
-        public async Task LoadGateways()
+        public async Task LoadGateways(string source = "lobby", bool silent = false)
         {
-            LoadingManager.Instance?.Show("Loading payment methods...");
+            Debug.Log($"[PaymentGateway] Request started (source: {source})");
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            if (!silent)
+            {
+                LoadingManager.Instance?.Show("Loading payment methods...");
+            }
             try
             {
-                var response = await ApiClient.Instance.Get<List<GatewayInfo>>(RechargeRoutes.Gateways("lobby"));
+                var response = await ApiClient.Instance.Get<List<GatewayInfo>>(RechargeRoutes.Gateways(source));
+                stopwatch.Stop();
 
                 cachedGateways.Clear();
                 if (response != null) cachedGateways.AddRange(response);
+                LoadedSource = source;
+
+                Debug.Log($"[PaymentGateway] Response received ({cachedGateways.Count} gateways, {stopwatch.ElapsedMilliseconds}ms)");
+                foreach (var gw in cachedGateways)
+                {
+                    Debug.Log($"[PaymentGateway] Gateway Response - id: {gw.id}, enabled_lobby: {gw.enabled_lobby}, enabled_ingame: {gw.enabled_ingame}, status: {gw.status}");
+                }
+                Debug.Log($"[PaymentGateway] Source: fresh API ({source})");
+                Debug.Log("[PaymentGateway] Cache updated");
 
                 if (cachedGateways.Count == 0)
                 {
@@ -49,15 +76,23 @@ namespace Features.Recharge.Controllers
                 {
                     OnGatewaysLoaded?.Invoke(cachedGateways);
                 }
+
+                Debug.Log("[PaymentGateway] UI refreshed");
             }
             catch (ApiException e)
             {
+                stopwatch.Stop();
                 Debug.LogError($"Load gateways failed: {e.Message}");
                 OnError?.Invoke("GATEWAY_LOAD_FAILED", "Failed to load payment methods");
+                Debug.LogWarning("[RechargeController] Toast.ShowError queued: Failed to load payment methods.");
+                Toast.Instance.ShowError("Failed to load payment methods.");
             }
             finally
             {
-                LoadingManager.Instance?.Hide();
+                if (!silent)
+                {
+                    LoadingManager.Instance?.Hide();
+                }
             }
         }
 
@@ -70,7 +105,7 @@ namespace Features.Recharge.Controllers
             }
             else
             {
-                BuildDefaultAmounts(cachedAmounts);
+                RefreshAmountsFromBootstrap();
             }
             OnAmountsLoaded?.Invoke(cachedAmounts);
         }
@@ -78,16 +113,35 @@ namespace Features.Recharge.Controllers
         public List<RechargeAmountPreset> GetDefaultAmounts()
         {
             if (cachedAmounts.Count > 0) return cachedAmounts;
-            BuildDefaultAmounts(cachedAmounts);
+            RefreshAmountsFromBootstrap();
             return cachedAmounts;
         }
 
-        void BuildDefaultAmounts(List<RechargeAmountPreset> target)
+        public void RefreshAmountsFromBootstrap()
+        {
+            cachedAmounts.Clear();
+            if (BootstrapService.Instance.TryGetRechargePresets(out var presets))
+            {
+                foreach (var p in presets)
+                {
+                    var display = MoneyFormatter.FormatPaisaRoundedRupees(p.amount * 100);
+                    var bonus = p.bonusAmount * 100;
+                    cachedAmounts.Add(new RechargeAmountPreset(p.amount * 100, display, bonus));
+                }
+            }
+            else
+            {
+                BuildFallbackAmounts(cachedAmounts);
+            }
+        }
+
+        void BuildFallbackAmounts(List<RechargeAmountPreset> target)
         {
             target.Clear();
-            foreach (var s in defaultAmounts)
+            var fallback = new[] { 100, 200, 500, 1000, 2000, 5000 };
+            foreach (var r in fallback)
             {
-                if (int.TryParse(s, out var rupees)) target.Add(new RechargeAmountPreset(rupees * 100));
+                target.Add(new RechargeAmountPreset(r * 100));
             }
         }
 
@@ -103,6 +157,7 @@ namespace Features.Recharge.Controllers
                     amount = amountPaisa,
                     currency = "INR",
                     provider = providerId,
+                    source = SceneManager.GetActiveScene().name.ToLowerInvariant() == "lobby" ? "lobby" : "in-game",
                     client_metadata = new Dictionary<string, object>
                     {
                         { "platform", NormalizedPlatform() },
@@ -115,7 +170,7 @@ namespace Features.Recharge.Controllers
                 if (response?.checkout != null && !string.IsNullOrEmpty(response.checkout.url))
                 {
                     OnRechargeCreated?.Invoke(response);
-                    _ = RefreshHistorySilent();
+                     _ = RefreshHistorySilent();
                     return response.checkout.url;
                 }
 
@@ -134,30 +189,39 @@ namespace Features.Recharge.Controllers
             }
         }
 
-        public async Task<List<RechargeRecord>> FetchHistory(bool forceRefresh = false, int limit = 50, int offset = 0)
+        public async Task FetchHistory(bool forceRefresh = false)
         {
-            if (isLoadingHistory) return cachedHistory;
+            if (isLoadingHistory) return;
 
-            if (!forceRefresh && (DateTime.UtcNow - lastHistoryFetchTime).TotalSeconds < historyRefreshCooldownSeconds)
-            {
-                return cachedHistory;
-            }
+            int page = forceRefresh ? 1 : CurrentHistoryPage;
+            int offset = (page - 1) * historyPageSize;
 
             isLoadingHistory = true;
             LoadingManager.Instance?.Show("Loading history...");
             try
             {
-                var response = await ApiClient.Instance.Get<RechargeRecord[]>(RechargeRoutes.List(limit, offset));
-                cachedHistory = response != null ? new List<RechargeRecord>(response) : new List<RechargeRecord>();
-                lastHistoryFetchTime = DateTime.UtcNow;
-                OnHistoryLoaded?.Invoke(cachedHistory);
-                return cachedHistory;
+                var response = await ApiClient.Instance.Get<RechargeRecord[]>(RechargeRoutes.List(historyPageSize, offset));
+
+                cachedHistory.Clear();
+                if (response != null)
+                {
+                    cachedHistory.AddRange(response);
+                }
+
+                CurrentHistoryPage = page;
+                TotalHistoryPages = response != null && response.Length > 0
+                    ? (int)Mathf.Ceil((float)response.Length / historyPageSize)
+                    : 1;
+                HasMoreHistory = response != null && response.Length >= historyPageSize;
+
+                OnHistoryLoaded?.Invoke(new List<RechargeRecord>(cachedHistory));
+                OnPaginationChanged?.Invoke(CurrentHistoryPage, TotalHistoryPages);
             }
             catch (ApiException e)
             {
                 Debug.LogError($"Load history failed: {e.Message}");
                 OnError?.Invoke("HISTORY_FAILED", "Failed to load recharge history");
-                return cachedHistory;
+                Toast.Instance.ShowError("Failed to load recharge history.");
             }
             finally
             {
@@ -166,21 +230,18 @@ namespace Features.Recharge.Controllers
             }
         }
 
-        async Task RefreshHistorySilent()
+        public async Task NextPage()
         {
-            try
-            {
-                var response = await ApiClient.Instance.Get<RechargeRecord[]>(RechargeRoutes.List(50, 0));
-                if (response != null)
-                {
-                    cachedHistory = new List<RechargeRecord>(response);
-                    OnHistoryLoaded?.Invoke(cachedHistory);
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"Silent history refresh failed: {e.Message}");
-            }
+            if (isLoadingHistory || !HasMoreHistory) return;
+            CurrentHistoryPage++;
+            await FetchHistory();
+        }
+
+        public async Task PreviousPage()
+        {
+            if (isLoadingHistory || CurrentHistoryPage <= 1) return;
+            CurrentHistoryPage--;
+            await FetchHistory();
         }
 
         public async Task<RechargeRecord> GetRechargeById(string rechargeId)
@@ -222,7 +283,7 @@ namespace Features.Recharge.Controllers
                 }
             }
 
-            if (anyChanged) OnHistoryLoaded?.Invoke(cachedHistory);
+            if (anyChanged) OnHistoryLoaded?.Invoke(new List<RechargeRecord>(cachedHistory));
         }
 
         public bool HasNonTerminalRecharges()
@@ -234,12 +295,39 @@ namespace Features.Recharge.Controllers
             return false;
         }
 
-        // The webhook credits the wallet server-side. When the player returns from the PSP
-        // browser tab the only way to learn the new state until WebSocket lands is to refetch.
         void OnApplicationFocus(bool hasFocus)
         {
-            if (!hasFocus || !HasNonTerminalRecharges()) return;
+            string ts = DateTime.Now.ToString("HH:mm:ss.fff");
+            if (!hasFocus)
+            {
+                Debug.Log($"[{ts}] [Lifecycle] OnApplicationFocus(false)");
+                return;
+            }
+            Debug.Log($"[{ts}] [Lifecycle] OnApplicationFocus(true) - hasNonTerminalRecharges={HasNonTerminalRecharges()}");
+            if (!HasNonTerminalRecharges()) return;
             _ = RefreshNonTerminalRecharges();
+        }
+
+        public async Task RefreshHistorySilent()
+        {
+            try
+            {
+                var response = await ApiClient.Instance.Get<RechargeRecord[]>(RechargeRoutes.List(historyPageSize, 0));
+                if (response != null)
+                {
+                    cachedHistory.Clear();
+                    if (response != null)
+                    {
+                        cachedHistory.AddRange(response);
+                    }
+                    OnHistoryLoaded?.Invoke(cachedHistory);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"Silent history refresh failed: {e.Message}");
+                Toast.Instance.ShowWarning("Could not refresh recharge history.");
+            }
         }
 
         static readonly HashSet<string> TerminalRechargeStatuses = new HashSet<string>

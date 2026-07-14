@@ -7,6 +7,8 @@ using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Core.Utils;
+using Core.Bootstrap;
 
 [System.Serializable]
 public class Card
@@ -18,7 +20,7 @@ public class Card
 public class AndarBaharGame : MonoBehaviour
 {
 
-public static AndarBaharGame Instance;
+    public static AndarBaharGame Instance;
     private System.Random random1;
     private System.Random random2;
     private System.Random random3;
@@ -70,7 +72,7 @@ public static AndarBaharGame Instance;
     public GameObject countdownPanel;
     private bool isBetting;
 
-    [SerializeField] List<Card>  andarCards, baharCards;
+    [SerializeField] List<Card> andarCards, baharCards;
     public List<Sprite> deck;
     public Image jokerImg;
     [SerializeField] List<Image> andarCardImg, baharCardImg;
@@ -87,6 +89,7 @@ public static AndarBaharGame Instance;
 
     public float walletAmount;
     public Text walletText;
+    private bool _resultAnimationComplete;
     SocketManagerAB socketManagerAB;
     TableBotManager botManagerRef;
     BetManager betManagerRef;
@@ -97,7 +100,6 @@ public static AndarBaharGame Instance;
 
     public GameObject showWinPanel;
     public TextMeshProUGUI showWinText;
-    APIs apisRef;
     public AudioClip noMoreBets_Clip;
     public AudioClip placeYourBets_Clip;
 
@@ -109,21 +111,19 @@ public static AndarBaharGame Instance;
     void Start()
     {
 
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
-        apisRef.FetchWallet();
         betManagerRef = FindFirstObjectByType<BetManager>();
 
         botManagerRef = FindObjectOfType<TableBotManager>();
 
         socketManagerAB = FindObjectOfType<SocketManagerAB>();
 
-        // burstRef = FindObjectOfType<BurstAB>();
         stopBetPanel.SetActive(false);
         startBetPanel.SetActive(false);
 
         andarCards.Clear();
         baharCards.Clear();
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
+
 
     }
 
@@ -156,18 +156,25 @@ public static AndarBaharGame Instance;
                 botManagerRef.InitializeBots(data, roundStartTime);
 
             }
-          
+
         }
 
     }
 
-    private void UpdateWallet(float wAmount)
+    public void UpdateWallet(float wAmount)
     {
         walletAmount = wAmount;
-        walletText.text = "₹" + wAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)wAmount);
     }
 
-    
+    public void BeginResultProcessing()
+    {
+        _resultAnimationComplete = false;
+    }
+
+    public bool IsResultAnimationComplete => _resultAnimationComplete;
+
+
 
     IEnumerator StartCountdown(float timeRem, long startTime, string[] seeds)
     {
@@ -395,6 +402,8 @@ public static AndarBaharGame Instance;
 
         yield return new WaitForSeconds(1f);
         WinSystem(cardsDealt, botsWinArray);
+
+        _resultAnimationComplete = true;
     }
 
     public void UpdateGameCards(List<string> andarCards, List<string> baharCards, int cardsDealt, int[] botWinArray)
@@ -440,18 +449,18 @@ public static AndarBaharGame Instance;
 
     public void ClearAllBets()
     {
-        if(!isBetting) return;
+        if (!isBetting) return;
         userPalceBet = false;
         float totalBets = 0;
-        foreach(float val in playerBets)
+        foreach (float val in playerBets)
         {
             totalBets += val;
         }
-        if(totalBets <= 0) return;
+        if (totalBets <= 0) return;
 
         walletAmount += totalBets;
-        walletText.text = "₹" + walletAmount.ToString("F2");
-        for(int i = 0; i< playerBets.Length; i++)
+        walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
+        for (int i = 0; i < playerBets.Length; i++)
         {
             playerBets[i] = 0;
         }
@@ -464,18 +473,18 @@ public static AndarBaharGame Instance;
     Vector3 recentTouchPos;
     void Awake()
     {
-        if(Instance != this)
+        if (Instance != this)
         {
             Instance = this;
         }
-    }    
+    }
     public void RegisterTouch(Vector3 touch)
     {
         recentTouchPos = touch;
     }
     void ClearMyCoins()
     {
-        foreach(GameObject g in myCoinsList)
+        foreach (GameObject g in myCoinsList)
         {
             Destroy(g);
         }
@@ -483,18 +492,19 @@ public static AndarBaharGame Instance;
     }
 
     void InstantiateCoin()
-    {        
+    {
         GameObject coin = Instantiate(TableBotManager.Instance.coinPrefabList[betManagerRef.betChipNum - 1], myCoinHolder);
         coin.transform.localScale = Vector3.one;
         coin.transform.position = recentTouchPos;
         myCoinsList.Add(coin);
         coin.transform.SetParent(myCoinHolder);
     }
-         
+
 
 
     public void PlaceBet(int betOn)
     {
+        int betValuePaisa = betManagerRef.betVal * 100;
         userPalceBet = true;
         if (!isBetting)
         {
@@ -504,7 +514,7 @@ public static AndarBaharGame Instance;
         }
 
 
-        if (walletAmount < betManagerRef.betVal)
+        if (walletAmount < betValuePaisa)
         {
             Debug.Log("Not enough balance to place the bet.");
             addCashPanel.SetActive(true);
@@ -512,14 +522,14 @@ public static AndarBaharGame Instance;
         }
 
 
-        playerBets[betOn] += betManagerRef.betVal; // Add the bet amount to the current bet level
+        playerBets[betOn] += betValuePaisa; // Add the bet amount to the current bet level
         InstantiateCoin();
-        Debug.Log($"Player placed {betManagerRef.betVal} on level {betOn}. Total bet on this level: {playerBets[betOn]}");
-        walletAmount -= betManagerRef.betVal;
+        Debug.Log($"Player placed {MoneyFormatter.FormatPaisa((long)betValuePaisa)} on level {betOn}. Total bet on this level: {MoneyFormatter.FormatPaisa((long)playerBets[betOn])}");
+        walletAmount -= betValuePaisa;
         UpdateWallet(walletAmount);
         // Update the UI with the new bet amount (this part depends on your specific UI setup)
 
-        socketManagerAB.SendBetDataToServer(betOn, betManagerRef.betVal);
+        socketManagerAB.SendBetDataToServer(betOn, betValuePaisa);
 
 
     }
@@ -566,7 +576,6 @@ public static AndarBaharGame Instance;
                     // If the winnings are greater than 0, add them to the player's balance
                     if (winnings > 0)
                     {
-                        walletAmount += winnings;
                         Debug.Log($"Player won {winnings} on Andar/Bahar level {i + 1}!");
                         totalWinnings += winnings;
                         StartCoroutine(ShowWinAmount());
@@ -579,7 +588,6 @@ public static AndarBaharGame Instance;
                 {
                     // If a shuffle multiplier was applied, the player wins with that multiplier
                     float shuffleWinnings = playerBets[i] * shuffleMultiplier;
-                    walletAmount += shuffleWinnings;
                     Debug.Log($"Player won {shuffleWinnings} on Shuffle Range level {i + 1} with multiplier {shuffleMultiplier}!");
                     totalWinnings += shuffleWinnings;
                     StartCoroutine(ShowWinAmount());
@@ -602,7 +610,6 @@ public static AndarBaharGame Instance;
         ShowBetRange(cardsShuffled);
         ClearMyCoins();
         botManagerRef.BotWin(botsWinArray);
-        UpdateWallet(walletAmount);
         Invoke("ResetTable", 4);
 
     }
@@ -666,7 +673,7 @@ public static AndarBaharGame Instance;
     {
 
         showWinPanel.SetActive(true);
-        showWinText.text = totalWinnings.ToString();
+        showWinText.text = MoneyFormatter.FormatPaisa((long)(totalWinnings));
         yield return new WaitForSeconds(2f);
         showWinPanel.SetActive(false);
 
@@ -747,7 +754,7 @@ public static AndarBaharGame Instance;
         waitingforNextPanel.SetActive(true);
 
     }
-  
+
     public void PlayEffect(AudioClip clip)
     {
         Debug.Log("clip " + clip);
@@ -877,16 +884,16 @@ public static AndarBaharGame Instance;
             int t = (randomValue8 * 50);
 
 
-            slot1.text = $"<color=yellow>{playerBets[0]}</color><color=#02ccfe>/{k}</color>";
-            slot2.text = $"<color=yellow>{playerBets[1]}</color><color=#02ccfe>/{l}</color>";
-            slot3.text = $"<color=yellow>{playerBets[2]}</color><color=#02ccfe>/{m}</color>";
-            slot4.text = $"<color=yellow>{playerBets[3]}</color><color=#02ccfe>/{n}</color>";
-            slot5.text = $"<color=yellow>{playerBets[4]}</color><color=#02ccfe>/{o}</color>";
-            slot6.text = $"<color=yellow>{playerBets[5]}</color><color=#02ccfe>/{p}</color>";
-            slot7.text = $"<color=yellow>{playerBets[6]}</color><color=#02ccfe>/{q}</color>";
-            slot8.text = $"<color=yellow>{playerBets[7]}</color><color=#02ccfe>/{r}</color>";
-            slot9.text = $"<color=yellow>{playerBets[8]}</color><color=#02ccfe>/{s}</color>";
-            slot10.text = $"<color=yellow>{playerBets[9]}</color><color=#02ccfe>/{t}</color>";
+            slot1.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)playerBets[0])}</color><color=#02ccfe>/{k}</color>";
+            slot2.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)playerBets[1])}</color><color=#02ccfe>/{l}</color>";
+            slot3.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)playerBets[2])}</color><color=#02ccfe>/{m}</color>";
+            slot4.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)playerBets[3])}</color><color=#02ccfe>/{n}</color>";
+            slot5.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)playerBets[4])}</color><color=#02ccfe>/{o}</color>";
+            slot6.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)playerBets[5])}</color><color=#02ccfe>/{p}</color>";
+            slot7.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)playerBets[6])}</color><color=#02ccfe>/{q}</color>";
+            slot8.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)playerBets[7])}</color><color=#02ccfe>/{r}</color>";
+            slot9.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)playerBets[8])}</color><color=#02ccfe>/{s}</color>";
+            slot10.text = $"<color=yellow>{MoneyFormatter.FormatPaisa((long)playerBets[9])}</color><color=#02ccfe>/{t}</color>";
 
 
             yield return new WaitForSeconds(updateInterval);

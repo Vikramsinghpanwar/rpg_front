@@ -7,9 +7,12 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SocketIOClient.Newtonsoft.Json;
 using SocketIOClient.JsonSerializer;
+using System.Threading.Tasks;
 using UnityEngine.SceneManagement;
 using TMPro;
+using Core.API;
 using Core.Config;
+using Core.Services;
 using Features.Lobby.Integration;
 
 public class SocketManagerCrash : MonoBehaviour
@@ -87,7 +90,7 @@ public class SocketManagerCrash : MonoBehaviour
         {
             Query = new Dictionary<string, string>
             {
-                {"token", "UNITY" }
+                {"token", TokenProvider.Instance?.AccessToken ?? string.Empty}
             },
             Transport = SocketIOClient.Transport.TransportProtocol.WebSocket
         });
@@ -218,6 +221,7 @@ public class SocketManagerCrash : MonoBehaviour
                     controllerRef = FindObjectOfType<ControllerCrash>();
                 }
                 controllerRef.EndGame(gameEndMultiplier);
+                _ = CGSBetService.Instance.RefreshWalletAsync();
             });
         });
 
@@ -360,56 +364,54 @@ public class SocketManagerCrash : MonoBehaviour
         }
     }
 
+    public void SendBetData(float betAmount)
+    {
+        _ = SendBetAsync(betAmount);
+    }
+
+    async Task SendBetAsync(float betAmount)
+    {
+        try
+        {
+            await CGSBetService.Instance.PlaceBetAsync(CGSGameKeys.Crash, null, (long)betAmount);
+        }
+        catch (ApiException ex)
+        {
+            Debug.LogWarning($"[SocketManagerCrash] Bet rejected: {ex.StatusCode} {ex.Message}");
+        }
+    }
+
     public void Cashout(float betAmount)
     {
-        var data = new Dictionary<string, object>
+        _ = CashoutAsync();
+    }
+
+    async Task CashoutAsync()
+    {
+        try
         {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-            { "betAmount", betAmount }
-        };
-        Debug.Log("Emitted Cashout");
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("cashOutData", jsonData);
+            await CGSBetService.Instance.CashoutAsync(CGSGameKeys.Crash);
+        }
+        catch (ApiException ex)
+        {
+            Debug.LogWarning($"[SocketManagerCrash] Cashout rejected: {ex.StatusCode} {ex.Message}");
+        }
+    }
+
+    public void ClearAllBets()
+    {
+        // Bets are HTTP-authoritative — no socket emit needed for clear
+    }
+
+    public void CancelBet(float betAmount)
+    {
+        // CGS has no HTTP cancel endpoint — once accepted a bet cannot be revoked
     }
 
     void SendPing()
     {
         lastPingTime = Time.time;
-        socket.Emit("ping_test"); // Send ping event to server
-    }
-    public void SendBetData(float betAmount)
-    {
-        var data = new Dictionary<string, object>
-        {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-            { "betAmount", betAmount }
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        Debug.Log("json : " + jsonData);
-        socket.Emit("sendBetData", jsonData);
-    }
-
-    public void ClearAllBets()
-    {
-        var data = new Dictionary<string, object>
-        {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("clearAllBet", jsonData);
-    }
-    public void CancelBet(float betAmount)
-    {
-        var data = new Dictionary<string, object>
-        {
-            { "betAmount", betAmount }
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        Debug.Log("json : " + jsonData);
-        socket.Emit("cancelBet", jsonData);
+        socket.Emit("ping_test");
     }
 
     public class BetDataWrapper

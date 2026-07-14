@@ -10,6 +10,9 @@ using SocketIOClient.Newtonsoft.Json;
 using System.IO;
 using Core.Config;
 using Features.Lobby.Integration;
+using System.Threading.Tasks;
+using Core.API;
+using Core.Bootstrap;
 
 public class SocketManagerKQ : MonoBehaviour
 {
@@ -21,6 +24,7 @@ public class SocketManagerKQ : MonoBehaviour
     RandomHistoryKQ historyRef;
     bool _isInitialFocus = true;
     public string currentRoundId;
+    bool _walletRefreshed;
 
 
 
@@ -218,6 +222,7 @@ public class SocketManagerKQ : MonoBehaviour
 
     public void StartBetting(string response)
     {
+        _walletRefreshed = false;
 
         JArray jsonArray = JArray.Parse(response);
 
@@ -294,54 +299,95 @@ public class SocketManagerKQ : MonoBehaviour
 
     public void Result(string response)
     {
-        JArray jsonArray = JArray.Parse(response);
-
-        // Access the first object in the array
-        JObject gameResultWrapper = (JObject)jsonArray[0]["betResults"];
-        if (gameResultWrapper == null)
+        Debug.Log("[KQ] Result received");
+        try
         {
-            Debug.LogError("Failed to parse 'betResults'. Check the response format.");
-            return;
+            JArray jsonArray = JArray.Parse(response);
+
+            JObject gameResultWrapper = (JObject)jsonArray[0]["betResults"];
+            if (gameResultWrapper == null)
+            {
+                Debug.LogError("Failed to parse 'betResults'. Check the response format.");
+                return;
+            }
+
+            JObject gameResult = (JObject)gameResultWrapper["result"];
+
+            List<string> kingCards = gameResultWrapper["kingCards"]?.ToObject<List<string>>() ?? new List<string>();
+            List<string> queenCards = gameResultWrapper["queenCards"]?.ToObject<List<string>>() ?? new List<string>();
+
+            char winner = (char)gameResult["winner"];
+            string kingType = gameResult["kingType"].ToString();
+            string queenType = gameResult["queenType"].ToString();
+
+            Debug.Log("[KQ] Result animation starting");
+            manager.BeginResultProcessing();
+            manager.Result(kingCards, queenCards, winner, kingType, queenType);
+            StartCoroutine(WaitForResultThenRefreshWallet());
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("Error parsing response: " + ex.Message);
+        }
+    }
+
+    private IEnumerator WaitForResultThenRefreshWallet()
+    {
+        yield return new WaitUntil(() => manager.IsResultAnimationComplete);
+
+        Debug.Log("[KQ] Result animation completed");
+        Debug.Log("[KQ] RefreshWalletAsync starting");
+
+        if (_walletRefreshed)
+        {
+            Debug.Log("[KQ] Wallet refresh already performed this round, skipping duplicate");
+            yield break;
+        }
+        _walletRefreshed = true;
+
+        var refreshTask = CGSBetService.Instance.RefreshWalletAsync();
+
+        while (!refreshTask.IsCompleted)
+        {
+            yield return null;
         }
 
-        // Accessing nested objects
-        JObject gameResult = (JObject)gameResultWrapper["result"];
+        if (refreshTask.IsFaulted)
+        {
+            Debug.LogWarning($"[KQ] RefreshWalletAsync failed: {refreshTask.Exception?.Message}");
+        }
+        else
+        {
+            Debug.Log("[KQ] RefreshWalletAsync completed");
 
-        // Parsing king and queen cards
-        List<string> kingCards = gameResultWrapper["kingCards"]?.ToObject<List<string>>() ?? new List<string>();
-        List<string> queenCards = gameResultWrapper["queenCards"]?.ToObject<List<string>>() ?? new List<string>();
-
-
-        char winner = (char)gameResult["winner"];
-        string kingType = gameResult["kingType"].ToString();
-        string queenType = gameResult["queenType"].ToString();
-
-        manager.Result(kingCards, queenCards, winner, kingType, queenType);
+            var bs = Core.Bootstrap.BootstrapService.Instance;
+            if (bs != null && bs.Wallet != null && manager != null)
+            {
+                manager.UpdateWallet(bs.Wallet.available_balance);
+                Debug.Log($"[KQ] Wallet UI updated from Bootstrap: {bs.Wallet.available_balance}");
+            }
+            else
+            {
+                Debug.LogWarning("[KQ] Bootstrap wallet not available after refresh, cannot update game UI");
+            }
+        }
     }
     public void SendBetDataToServer(int betOn, float betAmount)
     {
-        var data = new Dictionary<string, object>
-        {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-            { "betOn", betOn },
-            { "betAmount", betAmount }
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("sendData", jsonData);
+        _ = SendBetAsync(betOn, betAmount);
     }
 
-    public void ClearAllBets()
+    async Task SendBetAsync(int betOn, float betAmount)
     {
-        var data = new Dictionary<string, object>
+        try
         {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("clearAllBet", jsonData);
+            await CGSBetService.Instance.PlaceBetAsync(CGSGameKeys.KingQueen, betOn, (long)betAmount);
+        }
+        catch (ApiException ex)
+        {
+            Debug.LogWarning($"[SocketManagerKQ] Bet rejected: {ex.StatusCode} {ex.Message}");
+        }
     }
-
 
     /// <summary>
     /// ///////////////////////////////////////////////////

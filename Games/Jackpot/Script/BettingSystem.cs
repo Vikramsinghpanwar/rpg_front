@@ -9,6 +9,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System;
 using Features.Lobby.Integration;
+using Core.Utils;
+using Core.Bootstrap;
 
 public class BettingSystem : MonoBehaviour
 {
@@ -60,9 +62,8 @@ public class BettingSystem : MonoBehaviour
 
     public TextMeshProUGUI[] betAmountText;
     SocketManagerJackpot socketManagerJackpot;
-    float walletAmount;
+    long walletAmount;
     public Text walletText;
-    APIs apisRef;
     BetManager betManagerRef;
 
     public int[] payoutArray;
@@ -70,16 +71,14 @@ public class BettingSystem : MonoBehaviour
     void Start()
     {
         betManagerRef = FindObjectOfType<BetManager>();
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
-        apisRef.FetchWallet();
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
         socketManagerJackpot = FindObjectOfType<SocketManagerJackpot>();
     }
 
-    private void UpdateWallet(float wAmount)
+    private void UpdateWallet(long wAmount)
     {
         walletAmount = wAmount;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
     }
 
     IEnumerator RoundStart(float timeRem)
@@ -162,8 +161,8 @@ public class BettingSystem : MonoBehaviour
         totalBets += betManagerRef.betVal;
 
         DeductBetAmount(betManagerRef.betVal);
-        betAmountText[number].text = totalBetsForNumber[number].ToString();
-        socketManagerJackpot.SendBetDataToServer(number, betManagerRef.betVal, int.Parse(BootstrapLobbyAdapter.GetUserId()));
+        betAmountText[number].text = MoneyFormatter.FormatPaisa(totalBetsForNumber[number] * 100);
+        socketManagerJackpot.SendBetDataToServer(number, betManagerRef.betVal * 100, int.Parse(BootstrapLobbyAdapter.GetUserId()));
     }
 
     public void ClearAllBets()
@@ -173,10 +172,10 @@ public class BettingSystem : MonoBehaviour
         {
             total += totalBetsForNumber[i];
             totalBetsForNumber[i] = 0;
-            betAmountText[i].text = totalBetsForNumber[i].ToString();
+            betAmountText[i].text = MoneyFormatter.FormatPaisa(0);
         }
 
-        walletAmount += total;
+        walletAmount += total * 100;
         UpdateWallet(walletAmount);
         socketManagerJackpot.ClearAllBets();
 
@@ -196,7 +195,7 @@ public class BettingSystem : MonoBehaviour
     {
         if (walletAmount >= amount)
         {
-            walletAmount -= amount;
+            walletAmount -= amount * 100;
             UpdateWallet(walletAmount);
         }
         else
@@ -241,7 +240,7 @@ public class BettingSystem : MonoBehaviour
         {
             youWinPanel.SetActive(true);
             Invoke("DisableYouWin", 3f);
-            youWinTxt.text = (totalBetsForNumber[winner] * payoutArray[winner]).ToString("F2");
+            youWinTxt.text = MoneyFormatter.FormatPaisa((long)(totalBetsForNumber[winner] * payoutArray[winner] * 100));
         }
         newHistorySpawn.SetActive(true);
     }
@@ -309,7 +308,7 @@ public class BettingSystem : MonoBehaviour
                     int payoutMultiplier = GetPayoutMultiplier(randomResult);
                     int winnings = totalBetsForNumber[i] * payoutMultiplier;
                     totalWinnings += winnings;  // Add winnings to total
-                    walletAmount += winnings;
+                    walletAmount += winnings * 100;
                     Debug.Log($"You won {winnings}. New balance: {walletAmount}");
                     StartCoroutine(ShowWinAmount());
                     Debug.Log("Total Winnings: " + totalWinnings);
@@ -327,7 +326,7 @@ public class BettingSystem : MonoBehaviour
     IEnumerator ShowWinAmount()
     {
         showWinPanel.SetActive(true);
-        winAmountText.text = totalWinnings.ToString();
+        winAmountText.text = MoneyFormatter.FormatPaisa(totalWinnings);
         yield return new WaitForSeconds(3f);
         showWinPanel.SetActive(false);
 
@@ -398,8 +397,6 @@ public class BettingSystem : MonoBehaviour
         random6 = new System.Random(GenerateConsistentHash(seeds[5]));
         //random7 = new System.Random(GenerateConsistentHash(seeds[6]));
 
-        Debug.Log("111111111111111111" + random1.Next());
-
         // Skip ahead in the random sequences based on elapsed time
         int stepsToSkip = Mathf.FloorToInt(elapsedTimeInSeconds * 2); // 5 steps per second
         for (int i = 0; i < stepsToSkip; i++)
@@ -466,12 +463,12 @@ public class BettingSystem : MonoBehaviour
             int p1 = (randomValue6 * 30);
             //int q1 = (randomValue3 * 30);
 
-            otherPeopleBets_Txt_Array[0].text = k1.ToString();
-            otherPeopleBets_Txt_Array[1].text = l1.ToString();
-            otherPeopleBets_Txt_Array[2].text = m1.ToString();
-            otherPeopleBets_Txt_Array[3].text = n1.ToString();
-            otherPeopleBets_Txt_Array[4].text = o1.ToString();
-            otherPeopleBets_Txt_Array[5].text = p1.ToString();
+            otherPeopleBets_Txt_Array[0].text = MoneyFormatter.FormatPaisa(k1);
+            otherPeopleBets_Txt_Array[1].text = MoneyFormatter.FormatPaisa(l1);
+            otherPeopleBets_Txt_Array[2].text = MoneyFormatter.FormatPaisa(m1);
+            otherPeopleBets_Txt_Array[3].text = MoneyFormatter.FormatPaisa(n1);
+            otherPeopleBets_Txt_Array[4].text = MoneyFormatter.FormatPaisa(o1);
+            otherPeopleBets_Txt_Array[5].text = MoneyFormatter.FormatPaisa(p1);
             //otherPeopleBets_Txt_Array[0].text = q1.ToString();
 
             yield return new WaitForSeconds(updateInterval);

@@ -90,7 +90,7 @@ public class ManagerRummy2Player : MonoBehaviour
                         finishPanelScriptRef.TimeOut();
                         finishPanel.SetActive(true);
                     }
-                    else if(elapsedTime > 5 || p2Timer.GetComponent<Image>().fillAmount < 0.7f)
+                    else if (elapsedTime > 5 || p2Timer.GetComponent<Image>().fillAmount < 0.7f)
                     {
                         StopCoroutine(gameCoroutine);
                         float val = (currentValue * 30) - elapsedTime + 5;
@@ -103,7 +103,7 @@ public class ManagerRummy2Player : MonoBehaviour
                         float val = (currentValue * 30) - elapsedTime;
                         p2Coroutine = StartCoroutine(DecreaseOverTime(p2Timer, 30 - val));
                     }
-                    
+
                 }
 
             }
@@ -145,7 +145,7 @@ public class ManagerRummy2Player : MonoBehaviour
         connectionRef.DropBtn.SetActive(true);
 
         //player 2 chance
-        if(val < 2)
+        if (val < 2)
         {
             p2Coroutine = StartCoroutine(DecreaseOverTime(p2Timer));
             yield return new WaitForSeconds(Random.Range(1, 3));
@@ -166,14 +166,14 @@ public class ManagerRummy2Player : MonoBehaviour
             StopCoroutine(p2Coroutine);
             p2Timer.GetComponent<Image>().fillAmount = 0;
         }
-        
+
         //player chance
 
         if (!_isDeclared)
         {
-            #if UNITY_ANDROID || PLATFORM_ANDROID
-                    Handheld.Vibrate();
-                #endif
+#if UNITY_ANDROID || PLATFORM_ANDROID
+            Handheld.Vibrate();
+#endif
             myTimerCoroutine = StartCoroutine(DecreaseOverTime(myTimer));
             getCardBarrier.SetActive(false);
         }
@@ -305,7 +305,7 @@ public class ManagerRummy2Player : MonoBehaviour
 
     public void Leave()
     {
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 
     public void StartAgain()

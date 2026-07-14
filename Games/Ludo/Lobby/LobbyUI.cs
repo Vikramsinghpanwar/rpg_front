@@ -50,7 +50,7 @@ public class LobbyUI : MonoBehaviour
 
     public void BackToLobby()
     {
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
     public void RoomCreated(string jsonResponse)
     {
@@ -252,13 +252,13 @@ public class LobbyUI : MonoBehaviour
         switch (mode)
         {
             case "WhatsApp":
-                Application.OpenURL("whatsapp://send?text=Your Friend " + UserDetail.UserName + " has inivited you to join a private table on The Crown Empire. \n\nRoom ID: " + roomId_TMP.text);
+                Application.OpenURL("whatsapp://send?text=Your Friend " + UserDetail.UserName + " has inivited you to join a private table on The Black Pearl. \n\nRoom ID: " + roomId_TMP.text);
                 break;
             case "Telegram":
-                Application.OpenURL("https://t.me/share/url?url=Your Friend " + UserDetail.UserName + " has inivited you to join a private table on The Crown Empire. \n\nRoom ID: " + roomId_TMP.text);
+                Application.OpenURL("https://t.me/share/url?url=Your Friend " + UserDetail.UserName + " has inivited you to join a private table on The Black Pearl. \n\nRoom ID: " + roomId_TMP.text);
                 break;
             case "Copy":
-                GUIUtility.systemCopyBuffer = "Your Friend " + UserDetail.UserName + " has inivited you to join a private table on The Crown Empire. \n\nRoom ID: " + roomId_TMP.text;
+                GUIUtility.systemCopyBuffer = "Your Friend " + UserDetail.UserName + " has inivited you to join a private table on The Black Pearl. \n\nRoom ID: " + roomId_TMP.text;
                 ShowLog.instance.Show("Room ID copied to clipboard");
                 break;
         }

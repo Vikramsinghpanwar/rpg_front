@@ -10,6 +10,7 @@ namespace Features.Recharge.Models
         public long amount;
         public string currency;
         public string provider;
+        public string source;
         public Dictionary<string, object> client_metadata;
     }
 

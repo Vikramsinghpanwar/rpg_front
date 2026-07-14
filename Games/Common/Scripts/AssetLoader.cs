@@ -20,7 +20,7 @@ public class AssetLoader : MonoBehaviour
         foreach (LoadImgData i in imageDataArray)
         {
             LoadLocalImage(i);
-        }        
+        }
     }
 
     private void LoadLocalImage(LoadImgData imgData)
@@ -45,7 +45,7 @@ public class AssetLoader : MonoBehaviour
             Debug.LogError("Image not found in StreamingAssets. looking for : " + myPath);
             //StartCoroutine(DownloadImage(imgData));
         }
-    }   
+    }
 }
 
 [System.Serializable]

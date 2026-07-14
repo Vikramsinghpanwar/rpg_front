@@ -68,6 +68,8 @@ namespace Teenpatti
             dealerPosition = -1;
             currentTurn = -1;
             isGameActive = false;
+            rechargeTimeRemaining = 0;
+            rechargingPlayer = "";
         }
     }
 }

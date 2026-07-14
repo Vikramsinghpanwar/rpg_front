@@ -20,10 +20,14 @@ public class ChartManager : MonoBehaviour
         RandomOnlinePlayers();
         for (int i = 0; i < chartDataList.Count; i++)
         {
-            if (chartDataList[i].minEntry <= BootstrapLobbyAdapter.GetWalletBalanceTotal() / 100f)
+            long balance = BootstrapLobbyAdapter.GetWalletBalanceTotal();
+            if (GameMode.mode == GameMode.Modes.privateGame)
+            {
+                balance = BootstrapLobbyAdapter.GetWalletBalanceTotal() - BootstrapLobbyAdapter.GetBonusBalance();
+            }
+            if (chartDataList[i].minEntry <= balance / 100f)
             {
                 chartDataList[i].img.sprite = playNow;
-
             }
             else
             {

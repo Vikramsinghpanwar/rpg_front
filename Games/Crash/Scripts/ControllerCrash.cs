@@ -6,6 +6,8 @@ using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Core.Utils;
+using Core.Bootstrap;
 
 public class ControllerCrash : MonoBehaviour
 {
@@ -63,12 +65,13 @@ public class ControllerCrash : MonoBehaviour
         gameContainer.SetActive(false);
         BGM.Play();
         historyCreatorRef = FindObjectOfType<GameHistoryCrash>();
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
         apisRef.FetchWallet();
     }
     private void UpdateWallet(float wAmount)
     {
         walletAmount = wAmount;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)(wAmount * 100));
     }
 
     #region Socket Methods
@@ -141,7 +144,7 @@ public class ControllerCrash : MonoBehaviour
 
     public void EndGame(float val)
     {
-        if(val < 1)
+        if (val < 1)
         {
             val = 1f;
         }
@@ -246,7 +249,7 @@ public class ControllerCrash : MonoBehaviour
         StartCoroutine(peopleBetScript.AnimStart());
         rectangleGraphImg.SetActive(true);
         planeAnimator.SetBool("_fly", false);
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)(walletAmount * 100));
 
         _waitingForNextRound = true;
         betRoda.SetActive(false);

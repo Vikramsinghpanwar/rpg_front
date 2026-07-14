@@ -12,5 +12,7 @@ namespace Core.API.Endpoints
 
         public static string Detail(string id) => $"{Base}/{id}";
         public static string Cancel(string id) => $"{Base}/{id}/cancel";
+        public static readonly string SaveBank = $"{UserRoutes.Me}/payout-methods/bank";
+        public static readonly string SaveUpi = $"{UserRoutes.Me}/payout-methods/upi";
     }
 }

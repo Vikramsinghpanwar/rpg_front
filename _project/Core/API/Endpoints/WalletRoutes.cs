@@ -16,5 +16,8 @@ namespace Core.API.Endpoints
         public static string Locked(string userId)      => $"{TransactionsBase}/{userId}/locked";
         public static string LockEligibility(string userId, long amountPaisa)
             => $"{TransactionsBase}/{userId}/eligibility?amount={amountPaisa}";
+
+        public static string MeBalance() => $"{WalletsBase}/me/balance";
+        public static string MeWallets() => $"{WalletsBase}/me/wallets";
     }
 }

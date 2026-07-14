@@ -28,32 +28,33 @@ public class GameFilter : MonoBehaviour
     public GameContainer[] games;
     public static GameFilter Instance;
 
-    private void Awake() {
-        if(Instance == null)
+    private void Awake()
+    {
+        if (Instance == null)
         {
             Instance = this;
         }
     }
-    
+
     // Start is called before the first frame update
-    public void PopulateGames()
-    {
-        foreach(var game in GameActive.Instance.games)
-        {
-            if(game.active == 1)
-            {
-                foreach(var icon in games)
-                {
-                    if(icon.name == game.gamename.ToLower())
-                    {
-                        icon.active = true;
-                        icon.icon.SetActive(true);
-                    }
-                }
-            }
-        }
-        All();
-    }
+    // public void PopulateGames()
+    // {
+    //     foreach(var game in GameActive.Instance.games)
+    //     {
+    //         if(game.active == 1)
+    //         {
+    //             foreach(var icon in games)
+    //             {
+    //                 if(icon.name == game.gamename.ToLower())
+    //                 {
+    //                     icon.active = true;
+    //                     icon.icon.SetActive(true);
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     All();
+    // }
     public void All()
     {
         Filter(GameType.All);
@@ -77,7 +78,7 @@ public class GameFilter : MonoBehaviour
         foreach (var game in games)
         {
             if (game.tags.Contains(type) && game.active)
-            {   
+            {
                 game.icon.SetActive(true);
             }
             else game.icon.SetActive(false);

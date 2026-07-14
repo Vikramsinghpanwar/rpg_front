@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using Core.Utils;
 
 public class BetSystemCrash : MonoBehaviour
 {
@@ -50,7 +51,7 @@ public class BetSystemCrash : MonoBehaviour
     private void UpdateWallet(float wAmount)
     {
         controller.walletAmount = wAmount;
-        controller.walletText.text = "₹" + wAmount.ToString("F2");
+        controller.walletText.text = MoneyFormatter.FormatPaisa((long)(wAmount * 100));
     }
 
     // Update is called once per frame
@@ -69,7 +70,7 @@ public class BetSystemCrash : MonoBehaviour
         otherPlayerBetsRef.betAmount -= betAmount;
         otherPlayerBetsRef.myBet -= betAmount;
         betAmount = 0;
-        controller.walletText.text = controller.walletAmount.ToString("F2");
+        controller.walletText.text = MoneyFormatter.FormatPaisa((long)(controller.walletAmount * 100));
         PlayerPrefs.SetFloat("betInCrash", 0);
         socketManagerRef.ClearAllBets();
     }
@@ -83,7 +84,7 @@ public class BetSystemCrash : MonoBehaviour
             otherPlayerBetsRef.betAmount += val;
             otherPlayerBetsRef.myBet += val;
             controller.walletAmount -= val;
-            controller.walletText.text = "₹" + controller.walletAmount.ToString("F2");
+            controller.walletText.text = MoneyFormatter.FormatPaisa((long)(controller.walletAmount * 100));
 
             _betted = true;
             betAmount += val;
@@ -141,7 +142,7 @@ public class BetSystemCrash : MonoBehaviour
 
                     winPopUP.SetActive(true);
                     winPopUP.transform.GetChild(0).GetComponent<Text>().text = "Win " + val;
-                    winPopUP.transform.GetChild(1).GetComponent<Text>().text = "₹" + (betAmount * val);
+                    winPopUP.transform.GetChild(1).GetComponent<Text>().text = MoneyFormatter.FormatPaisa((long)(betAmount * val));
                     Invoke("OffWinPopUp", 2);
                 }
                 controller.walletAmount += cashOutAmt;
@@ -177,7 +178,7 @@ public class BetSystemCrash : MonoBehaviour
         cashOutBTN.SetActive(true);
         do
         {
-            cashOutAmtText.text = (betAmount * controller.s).ToString("F2");
+            cashOutAmtText.text = MoneyFormatter.FormatPaisa((long)(betAmount * controller.s * 100));
             yield return new WaitForSeconds(0.05f);
 
 

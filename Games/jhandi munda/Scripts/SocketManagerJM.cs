@@ -6,8 +6,13 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SocketIOClient.Newtonsoft.Json;
 using UnityEngine.SceneManagement;
+using System.Threading.Tasks;
+using Core.API;
 using Core.Config;
+using Core.Services;
 using Features.Lobby.Integration;
+using Core.Bootstrap;
+using System.Collections;
 
 [DisallowMultipleComponent]
 public class SocketManagerJM : MonoBehaviour
@@ -20,6 +25,7 @@ public class SocketManagerJM : MonoBehaviour
     RandomHistoryDT historyRef;
     bool _isInitialFocus = true;
     public string currentRoundId = "";
+    bool _walletRefreshed;
 
     //singleton pattern
 
@@ -97,7 +103,7 @@ public class SocketManagerJM : MonoBehaviour
         {
             Query = new Dictionary<string, string>
             {
-                {"token", "UNITY" }
+                {"token", TokenProvider.Instance?.AccessToken ?? string.Empty}
             },
             Transport = SocketIOClient.Transport.TransportProtocol.WebSocket
         });
@@ -245,6 +251,7 @@ public class SocketManagerJM : MonoBehaviour
 
     public void StartBetting(string response)
     {
+        _walletRefreshed = false;
         Debug.Log("start Betting : " + response);
         JArray jsonArray = JArray.Parse(response);
 
@@ -293,24 +300,66 @@ public class SocketManagerJM : MonoBehaviour
 
     public void Result(SocketIOResponse response)
     {
-        Debug.Log("result : " + response);
+        Debug.Log("[JM] Result received");
         try
         {
             JArray jsonResponseArray = JArray.Parse(response.ToString());
             JObject firstObject = jsonResponseArray[0] as JObject;
             firstObject.TryGetValue("resultDiceArray", out JToken rDA);
-
             JArray botWinA = (JArray)firstObject["botWinnerArray"];
-
             int[] botWinArray = botWinA.ToObject<int[]>();
             int[] resultDiceArray = rDA.ToObject<int[]>();
 
-
-            manager.DisplayCards(resultDiceArray, botWinArray);//, botWinArray);
+            Debug.Log("[JM] Result animation starting");
+            manager.BeginResultProcessing();
+            manager.DisplayCards(resultDiceArray, botWinArray);
+            StartCoroutine(WaitForResultThenRefreshWallet());
         }
         catch (Exception ex)
         {
             Debug.LogError("Error parsing response: " + ex.Message);
+        }
+    }
+
+    private IEnumerator WaitForResultThenRefreshWallet()
+    {
+        yield return new WaitUntil(() => manager.IsResultAnimationComplete);
+
+        Debug.Log("[JM] Result animation completed");
+        Debug.Log("[JM] RefreshWalletAsync starting");
+
+        if (_walletRefreshed)
+        {
+            Debug.Log("[JM] Wallet refresh already performed this round, skipping duplicate");
+            yield break;
+        }
+        _walletRefreshed = true;
+
+        var refreshTask = CGSBetService.Instance.RefreshWalletAsync();
+
+        while (!refreshTask.IsCompleted)
+        {
+            yield return null;
+        }
+
+        if (refreshTask.IsFaulted)
+        {
+            Debug.LogWarning($"[JM] RefreshWalletAsync failed: {refreshTask.Exception?.Message}");
+        }
+        else
+        {
+            Debug.Log("[JM] RefreshWalletAsync completed");
+
+            var bs = Core.Bootstrap.BootstrapService.Instance;
+            if (bs != null && bs.Wallet != null && manager != null)
+            {
+                manager.UpdateWallet(bs.Wallet.available_balance);
+                Debug.Log($"[JM] Wallet UI updated from Bootstrap: {bs.Wallet.available_balance}");
+            }
+            else
+            {
+                Debug.LogWarning("[JM] Bootstrap wallet not available after refresh, cannot update game UI");
+            }
         }
     }
 
@@ -335,25 +384,24 @@ public class SocketManagerJM : MonoBehaviour
     }
     public void SendBetDataToServer(int betOn, float betAmount)
     {
-        var data = new Dictionary<string, object>
-        {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-            { "betOn", betOn },
-            { "betAmount", betAmount }
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("sendData", jsonData);
+        _ = SendBetAsync(betOn, betAmount);
     }
+
+    async Task SendBetAsync(int betOn, float betAmount)
+    {
+        try
+        {
+            await CGSBetService.Instance.PlaceBetAsync(CGSGameKeys.JhandiMunda, betOn, (long)betAmount);
+        }
+        catch (ApiException ex)
+        {
+            Debug.LogWarning($"[SocketManagerJM] Bet rejected: {ex.StatusCode} {ex.Message}");
+        }
+    }
+
     public void ClearAllBets()
     {
-        var data = new Dictionary<string, object>
-        {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-        };
-
-        string jsonData = JsonConvert.SerializeObject(data);
-        socket.Emit("clearAllBet", jsonData);
+        // Bets are HTTP-authoritative — no socket emit needed for clear
     }
 
     GameObject currentlyOpenPanel;

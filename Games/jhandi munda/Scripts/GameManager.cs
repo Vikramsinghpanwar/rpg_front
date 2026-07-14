@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
+using Core.Utils;
 
 public class GameManager : MonoBehaviour
 {
@@ -322,7 +323,7 @@ public class GameManager : MonoBehaviour
 
     void UpdateWalletUI()
     {
-        walletText.text = $"{humanPlayer.balance}";
+        walletText.text = MoneyFormatter.FormatPaisa(humanPlayer.balance);
         UpdateBettingAmountButtonInteractability();
     }
 }

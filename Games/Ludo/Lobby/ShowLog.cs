@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using Core.Services;
 
 public class ShowLog : MonoBehaviour
 {
@@ -30,10 +31,7 @@ public class ShowLog : MonoBehaviour
 
     public void Show(string msg, float time = 3f)
     {
-#if UNITY_ANDROID || PLATFORM_ANDROID
-                    Handheld.Vibrate();
-                #endif
-
+        VibrationService.Vibrate();
         Debug.Log("ShowLog: " + msg);
         textObj.text = msg;
         LogObject.SetActive(true);

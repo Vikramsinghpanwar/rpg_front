@@ -11,6 +11,8 @@ using Core.API.Endpoints;
 using Core.API;
 using static Teenpatti.WebSocketServerRequest;
 using Features.Lobby.Integration;
+using Core.Bootstrap;
+using Newtonsoft.Json;
 
 namespace Teenpatti
 {
@@ -29,6 +31,7 @@ namespace Teenpatti
         private const float RECONNECT_DELAY = 2f;
         private int reconnectAttempts = 0;
         private bool isReconnecting = false;
+        private CancellationTokenSource _reconnectCts;
 
         // Game state tracking
         private string lastTableId = "";
@@ -51,14 +54,16 @@ namespace Teenpatti
 
         private void Update()
         {
-            // if (Input.GetKeyDown(KeyCode.W))
-            // {
-            //     OnApplicationPause(true);
-            //     Disconnect();
-            // }else if (Input.GetKeyDown(KeyCode.S))
-            // {
-            //     OnApplicationPause(false);
-            // }
+            if (Input.GetKeyDown(KeyCode.W))
+            {
+                OnApplicationPause(true);
+                Disconnect();
+            }
+            else if (Input.GetKeyDown(KeyCode.S))
+            {
+                OnApplicationPause(false);
+            }
+
             // Handle ping/pong keep-alive
             if (isConnected)
             {
@@ -75,63 +80,32 @@ namespace Teenpatti
 
         public async Task<bool> JoinViaGateway(int bootAmount, string privateCode = "")
         {
-            var joinRequest = new TeenPattiJoinRequest
+            Debug.Log($"Attempting to join via gateway: bootAmount={bootAmount}, privateCode={(string.IsNullOrEmpty(privateCode) ? "none" : privateCode)}");
+            if (GameMode.mode == GameMode.Modes.privateGame)
             {
-                // userID = BootstrapLobbyAdapter.GetUserId(),
-                // username = UserDetail.UserName,
+                if (TeenpattiGameDataLobby.createTable)
+                {
+                    return await CreatePrivateRoomViaGateway(bootAmount);
+                }
+                else if (!string.IsNullOrEmpty(privateCode))
+                {
+                    return await JoinPrivateRoomViaGateway(bootAmount, privateCode);
+                }
+            }
+            Debug.Log("Joining public game via gateway");
 
+            var request = new TeenPattiJoinRequest
+            {
                 boot_amount = bootAmount,
-                privateCode = privateCode,
-                buyin = 50,//(int)Wallet.GetTotalWallet(),
-                gameType = GameMode.mode == GameMode.Modes.publicGame ? "public" : "private",
-                attemptID = Guid.NewGuid().ToString() // Unique ID for this join attempt
+                buyin = BootstrapService.Instance.Wallet.available_balance / 100,
+                gameType = "public",
+                attemptID = Guid.NewGuid().ToString()
             };
 
             try
             {
-                var response = await ApiClient.Instance.Post<JoinApiResponse>(TeenPattiRoutes.JoinGame, joinRequest);
-                GameLiveData.wasReconnectFromGateway = response.was_reconnect;
-                GameLiveData.instance.tableId = response.table_id;// ?? response.tableID;
-
-                if (response == null)
-                {
-                    Debug.LogError("Join API returned null");
-                    return false;
-                }
-
-                switch (response.status)
-                {
-                    case "ACTIVE":
-                    case "RECONNECTABLE":
-                        Debug.Log($"Join successful. Connecting to WS: {response.ws_url}");
-                        await ConnectToServer(response.ws_url, response.ws_token);
-                        return true;
-
-                    case "SETTLING":
-                        Debug.Log("Game is settling, please wait...");
-                        MainThreadDispatcher.Enqueue(() =>
-                        {
-                            TeenpattiLobby.instance?.ShowMatchmakingStatus("Round in progress, please wait...");
-                        });
-                        // Implement polling or wait for SETTLING to complete
-                        return await PollForReconnect(bootAmount, privateCode);
-
-                    case "NONE":
-                        Debug.Log("No active game session found");
-                        MainThreadDispatcher.Enqueue(() =>
-                        {
-                            // Show "session ended" UI for rejoin scenarios
-                            if (TeenpattiGameDataLobby.isRejoin)
-                            {
-                                // User can re-join from lobby
-                            }
-                        });
-                        return false;
-
-                    default:
-                        Debug.LogError($"Unknown join status: {response.status}");
-                        return false;
-                }
+                var response = await ApiClient.Instance.Post<JoinApiResponse>(TeenPattiRoutes.JoinGame, request);
+                return await ProcessJoinResponse(response);
             }
             catch (ApiException ex)
             {
@@ -140,18 +114,127 @@ namespace Teenpatti
             }
         }
 
+        private async Task<bool> CreatePrivateRoomViaGateway(int bootAmount)
+        {
+            Debug.Log($"Creating private room via gateway: bootAmount={bootAmount}");
+            var request = new TeenPattiJoinRequest
+            {
+                boot_amount = bootAmount,
+                buyin = (BootstrapService.Instance.Wallet.available_balance - BootstrapService.Instance.Wallet.bonus_balance) / 100,
+                gameType = "private",
+                attemptID = Guid.NewGuid().ToString()
+            };
+
+            try
+            {
+                var response = await ApiClient.Instance.Post<PrivateCreateApiResponse>(TeenPattiRoutes.PrivateRoomCreate, request);
+                if (response == null)
+                {
+                    Debug.LogError("Private room create API returned null");
+                    return false;
+                }
+
+                isInPrivateRoom = true;
+                currentPrivateCode = response.private_code;
+                TeenpattiGameDataLobby.teenpattiTableID_for_JOIN = response.private_code;
+                PlayerPrefs.SetString("savedPrivateCode", response.private_code);
+
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (TeenpattiLobby.instance != null)
+                        TeenpattiLobby.instance.OnRoomCreated(response.private_code);
+                });
+
+                GameLiveData.instance.tableId = response.session.table_id;
+                Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Backend] Private room created: tableID={response.session.table_id}, wsUrl={response.session.ws_url}");
+                await ConnectToServer(response.session.ws_url, response.session.ws_token);
+                return true;
+            }
+            catch (ApiException ex)
+            {
+                Debug.LogError($"Private room create API failed: {ex.Message}");
+                Toast.Instance.ShowError("Failed to create private room : " + ex.Message);
+                return false;
+            }
+        }
+
+        private async Task<bool> JoinPrivateRoomViaGateway(int bootAmount, string privateCode)
+        {
+            var request = new TeenPattiJoinRequest
+            {
+                boot_amount = bootAmount,
+                buyin = (BootstrapService.Instance.Wallet.available_balance - BootstrapService.Instance.Wallet.bonus_balance) / 100,
+                gameType = "private",
+                private_code = privateCode,
+                attemptID = Guid.NewGuid().ToString()
+            };
+
+            try
+            {
+                var response = await ApiClient.Instance.Post<JoinApiResponse>(TeenPattiRoutes.PrivateRoomJoin, request);
+                isInPrivateRoom = true;
+                currentPrivateCode = privateCode;
+                PlayerPrefs.SetString("savedPrivateCode", privateCode);
+                return await ProcessJoinResponse(response);
+            }
+            catch (ApiException ex)
+            {
+                Debug.LogError($"Private room join API failed: {ex.Message}");
+                Toast.Instance.ShowError("Failed to join private room : " + ex.Message);
+                return false;
+            }
+        }
+
+        private async Task<bool> ProcessJoinResponse(JoinApiResponse response)
+        {
+            if (response == null)
+            {
+                Debug.LogError("Join API returned null");
+                return false;
+            }
+
+            GameLiveData.wasReconnectFromGateway = response.was_reconnect;
+            GameLiveData.instance.tableId = response.table_id;
+
+            switch (response.status)
+            {
+                case "ACTIVE":
+                case "RECONNECTABLE":
+                    Debug.Log($"Join successful. Connecting to WS: {response.ws_url}");
+                    await ConnectToServer(response.ws_url, response.ws_token);
+                    return true;
+
+                case "SETTLING":
+                    Debug.Log("Game is settling, please wait...");
+                    MainThreadDispatcher.Enqueue(() =>
+                    {
+                        TeenpattiLobby.instance?.ShowMatchmakingStatus("Round in progress, please wait...");
+                    });
+                    return await PollForReconnect(GameMode.tableEntryFee, currentPrivateCode);
+                case "NONE":
+                    Debug.Log("No active game session found");
+                    return false;
+
+                default:
+                    Debug.LogError($"Unknown join status: {response.status}");
+                    return false;
+            }
+        }
+
         private async Task<bool> PollForReconnect(int bootAmount, string privateCode)
         {
             int attempts = 0;
-            const int maxAttempts = 30;
+            const int maxAttempts = 3;
             const float delayMs = 500f;
 
             while (attempts < maxAttempts)
             {
                 await Task.Delay((int)delayMs);
 
-                var rejoinResponse = await ApiClient.Instance.Get<RejoinApiResponse>(
-                    $"{TeenPattiRoutes.RejoinGame}?tableID={PlayerPrefs.GetString("savedTableID")}");
+                string url = $"{TeenPattiRoutes.RejoinGame}";
+                Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Backend] PollForReconnect GET: {url}");
+
+                var rejoinResponse = await ApiClient.Instance.Get<RejoinApiResponse>(url);
 
                 if (rejoinResponse?.status == "ACTIVE" || rejoinResponse?.status == "RECONNECTABLE")
                 {
@@ -162,15 +245,18 @@ namespace Teenpatti
                 attempts++;
             }
 
+            Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Backend] PollForReconnect timed out after {maxAttempts} attempts");
             return false; // Timeout
         }
 
 
         public async Task ConnectToServer(string wsUrl = null, string wsToken = null)
         {
-            string serverUrl = wsUrl ?? GetServerUrl();
+            string ts = DateTime.Now.ToString("HH:mm:ss.fff");
+            Debug.Log($"[{ts}] [WS] ConnectToServer called: wsUrl={(string.IsNullOrEmpty(wsUrl) ? "null" : wsUrl)}, wsToken={(string.IsNullOrEmpty(wsToken) ? "null/empty" : "present")}");
 
-            // If token is provided, append as query parameter
+            string serverUrl = wsUrl;
+
             if (!string.IsNullOrEmpty(wsToken))
             {
                 serverUrl = $"{serverUrl}?token={wsToken}";
@@ -179,6 +265,10 @@ namespace Teenpatti
             if (WebSocketClient.Instance != null)
             {
                 await WebSocketClient.Instance.Connect(serverUrl);
+            }
+            else
+            {
+                Debug.LogError($"[{ts}] [WS] ConnectToServer failed: WebSocketClient.Instance is null");
             }
         }
 
@@ -194,60 +284,60 @@ namespace Teenpatti
 
         private void OnWebSocketConnected()
         {
+            string ts = DateTime.Now.ToString("HH:mm:ss.fff");
+            Debug.Log($"[{ts}] [WS] OnWebSocketConnected");
             isConnected = true;
             pingTimer = 0f;
             reconnectAttempts = 0;
             isReconnecting = false;
 
+            bool wasRejoin = TeenpattiGameDataLobby.isRejoin;
+            TeenpattiGameDataLobby.isRejoin = false;
+            GameLiveData.wasReconnectFromGateway = false;
+
             Debug.Log("Successfully connected to WebSocket server");
 
             MainThreadDispatcher.Enqueue(async () =>
             {
-                if (TeenpattiGameDataLobby.isRejoin || GameLiveData.wasReconnectFromGateway)
+                GameManager.Instance?.ShowReconnectOverlay(false);
+                if (wasRejoin)
                 {
-                    // This is a reconnection - request table state directly
-                    Debug.Log("Reconnect detected - requesting table state");
+                    Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [WS] Reconnect completed; table state will arrive from server");
                     if (WebSocketServerRequest.Instance != null)
                     {
-                        //join/rejoin was handled by http, just need to sync state
-                        //await WebSocketServerRequest.Instance.RejoinGame(GameLiveData.instance.tableId);
                     }
                 }
                 else if (GameMode.mode == GameMode.Modes.publicGame)
                 {
-                    JoinMatchmaking();
                 }
                 else if (GameMode.mode == GameMode.Modes.privateGame)
                 {
                     Debug.Log("about private table");
-                    if (TeenpattiGameDataLobby.isRejoin)
-                    {
-                        // Rejoin private room if we were in one
-                        if (TeenpattiGameDataLobby.createTable)
-                        {
-                            Debug.Log("crrr");
-                            //CreatePrivateRoom(GameMode.tableEntryFee, TeenpattiGameDataLobby.teenpattiTableID_for_JOIN);
-                        }
-                        else
-                        {
-                            JoinPrivateTable(TeenpattiGameDataLobby.teenpattiTableID_for_JOIN ?? GameLiveData.instance.privateTableCode ?? PlayerPrefs.GetString("savedPrivateCode"));
-                        }
+                    // if (TeenpattiGameDataLobby.isRejoin)
+                    // {
+                    //     if (TeenpattiGameDataLobby.createTable)
+                    //     {
+                    //         Debug.Log("crrr");
+                    //     }
+                    //     else
+                    //     {
+                    //         JoinPrivateTable(TeenpattiGameDataLobby.teenpattiTableID_for_JOIN ?? GameLiveData.instance.privateTableCode ?? PlayerPrefs.GetString("savedPrivateCode"));
+                    //     }
 
-                    }
-                    else
-                    {
-                        // Rejoin private room if we were in one
-                        if (TeenpattiGameDataLobby.createTable)
-                        {
-                            Debug.Log("crrr");
-                            CreatePrivateRoom(GameMode.tableEntryFee, TeenpattiGameDataLobby.teenpattiTableID_for_JOIN);
-                        }
-                        else
-                        {
-                            JoinPrivateTable(TeenpattiGameDataLobby.teenpattiTableID_for_JOIN);
-                        }
+                    // }
+                    // else
+                    // {
+                    //     if (TeenpattiGameDataLobby.createTable)
+                    //     {
+                    //         Debug.Log("crrr");
+                    //         CreatePrivateRoom(GameMode.tableEntryFee, TeenpattiGameDataLobby.teenpattiTableID_for_JOIN);
+                    //     }
+                    //     else
+                    //     {
+                    //         JoinPrivateTable(TeenpattiGameDataLobby.teenpattiTableID_for_JOIN);
+                    //     }
 
-                    }
+                    // }
                 }
             });
         }
@@ -292,87 +382,134 @@ namespace Teenpatti
 
         private void OnWebSocketDisconnected(string reason)
         {
+            string ts = DateTime.Now.ToString("HH:mm:ss.fff");
+            Debug.Log($"[{ts}] [WS] OnWebSocketDisconnected: {reason}");
             isConnected = false;
-            Debug.Log($"Disconnected from server: {reason}");
-
-            // Trigger reconnect via gateway
+            if (reason.Contains("Intentional"))
+            {
+                Debug.Log($"[{ts}] [WS] Disconnection was intentional, no reconnection will be attempted");
+                return;
+            }
+            if (SceneManager.GetActiveScene().name == "Lobby")
+            {
+                Debug.Log($"[{ts}] [WS] Disconnection occurred in Lobby scene, no reconnection will be attempted");
+                return;
+            }
             MainThreadDispatcher.Enqueue(async () =>
             {
+                if (WebSocketClient.Instance.isConnecting) return; // Don't attempt reconnection if we were still trying to connect
+
+                Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Reconnect] OnWebSocketDisconnected → calling HandleReconnection()");
                 await HandleReconnection();
             });
         }
 
+        private void OnDestroy()
+        {
+            if (WebSocketClient.Instance != null)
+            {
+                WebSocketClient.Instance.OnConnected -= OnWebSocketConnected;
+                WebSocketClient.Instance.OnDisconnected -= OnWebSocketDisconnected;
+                WebSocketClient.Instance.OnMessageReceived -= OnWebSocketMessage;
+            }
+            _pauseCancelToken?.Cancel();
+            _pauseCancelToken = null;
+            _reconnectCts?.Cancel();
+            isReconnecting = false;
+            MainThreadDispatcher.Reset();
+        }
+
         private async Task HandleReconnection()
         {
-            if (isReconnecting) return;
-            isReconnecting = true;
+            _reconnectCts?.Cancel();
+            _reconnectCts = new CancellationTokenSource();
+            var token = _reconnectCts.Token;
 
-            // Show reconnecting UI
-            TeenpattiLobby.instance?.ShowReconnectOverlay(true);
+            string ts = DateTime.Now.ToString("HH:mm:ss.fff");
+            if (isReconnecting)
+            {
+                Debug.Log($"[{ts}] [Reconnect] HandleReconnection skipped - already reconnecting");
+                return;
+            }
+            isReconnecting = true;
+            Debug.Log($"[{ts}] [Reconnect] HandleReconnection started");
+
+            GameManager.Instance?.ShowReconnectOverlay(true);
 
             float backoff = 0.5f;
-            int maxAttempts = 60; // ~5 minutes with max backoff
+            int maxAttempts = 60;
 
-            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            try
             {
-                try
+                for (int attempt = 0; attempt < maxAttempts; attempt++)
                 {
-                    var savedTableID = PlayerPrefs.GetString("savedTableID", "");
-                    var rejoinResponse = await ApiClient.Instance.Post<RejoinApiResponse>(
-                        TeenPattiRoutes.RejoinGame,
-                        new { tableID = savedTableID, userID = BootstrapLobbyAdapter.GetUserId() }
-                    );
+                    token.ThrowIfCancellationRequested();
 
-                    if (rejoinResponse?.status == "ACTIVE" || rejoinResponse?.status == "RECONNECTABLE")
+                    try
                     {
-                        await ConnectToServer(rejoinResponse.ws_url, rejoinResponse.ws_token);
-                        TeenpattiLobby.instance?.ShowReconnectOverlay(false);
-                        isReconnecting = false;
-                        return;
-                    }
-                    else if (rejoinResponse?.status == "NONE")
-                    {
-                        // Session expired
-                        TeenpattiLobby.instance?.ShowReconnectOverlay(false);
-                        MainThreadDispatcher.Enqueue(() =>
+                        Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Backend] POST /tgs/rejoin attempt {attempt + 1}");
+
+                        var rejoinResponse = await ApiClient.Instance.Post<RejoinApiResponse>(
+                            TeenPattiRoutes.RejoinGame
+                        );
+
+                        Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Backend] Rejoin response: status={rejoinResponse?.status ?? "null"}, wsUrl={rejoinResponse?.ws_url ?? "null"}, wsToken={(string.IsNullOrEmpty(rejoinResponse?.ws_token) ? "MISSING" : "present")}, table_id={rejoinResponse?.table_id ?? "null"}");
+
+                        if (rejoinResponse?.status == "ACTIVE" || rejoinResponse?.status == "RECONNECTABLE")
                         {
-                            // Show "session ended" UI, navigate to lobby
-                            SceneManager.LoadScene("Lobby");
-                        });
+                            await ConnectToServer(rejoinResponse.ws_url, rejoinResponse.ws_token);
+                            GameManager.Instance?.ShowReconnectOverlay(false);
+                            isReconnecting = false;
+                            Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Reconnect] Reconnect completed successfully");
+                            return;
+                        }
+                        else if (rejoinResponse?.status == "NONE")
+                        {
+                            Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Reconnect] Backend returned NONE - session expired");
+                            GameManager.Instance?.ShowReconnectOverlay(false);
+                            MainThreadDispatcher.Enqueue(() =>
+                            {
+                                SceneManager.LoadScene("Lobby");
+                            });
+                            isReconnecting = false;
+                            return;
+                        }
+                    }
+                    catch (ApiException ex)
+                    {
+                        Debug.LogError($"[{DateTime.Now:HH:mm:ss.fff}] [Reconnect] HTTP error on attempt {attempt + 1}: status={ex.StatusCode}, code={ex.ErrorCode}, body={ex.RawBody}");
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Reconnect] Reconnect cancelled during attempt {attempt + 1}");
                         isReconnecting = false;
                         return;
                     }
-                }
-                catch (Exception ex)
-                {
-                    Debug.Log($"Reconnect attempt {attempt + 1} failed: {ex.Message}");
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[{DateTime.Now:HH:mm:ss.fff}] [Reconnect] Attempt {attempt + 1} failed: {ex.Message}");
+                    }
+
+                    await Task.Delay((int)(backoff * 1000), token);
+                    token.ThrowIfCancellationRequested();
+                    backoff = Mathf.Min(backoff * 2, 8f);
                 }
 
-                await Task.Delay((int)(backoff * 1000));
-                backoff = Mathf.Min(backoff * 2, 8f);
+                Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Reconnect] HandleReconnection failed - max attempts reached");
             }
-
-            // Max attempts reached
-            TeenpattiLobby.instance?.ShowReconnectOverlay(false);
-            MainThreadDispatcher.Enqueue(() =>
+            catch (OperationCanceledException)
             {
-                // Show connection failed UI
-            });
-            isReconnecting = false;
+                Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Reconnect] HandleReconnection cancelled");
+            }
+            finally
+            {
+                GameManager.Instance?.ShowReconnectOverlay(false);
+                isReconnecting = false;
+            }
         }
         private void OnWebSocketMessage(string message)
         {
             // Messages are handled by WebSocketMessageHandler
-        }
-
-        private string GetServerUrl()
-        {
-            // Configure based on your environment
-            string protocol = Const.isSecure ? "wss://" : "ws://";
-            string host = Const.teenpattiHost;
-            string port = Const.teenpattiPort;
-
-            return $"{protocol}{host}:{port}/ws";
         }
 
         #region Public Game Methods
@@ -493,21 +630,76 @@ namespace Teenpatti
                 return;
             }
 
-            Debug.Log($"Leaving private room: {currentPrivateCode}");
+            Debug.Log("Leaving private room");
 
-            // Send leave message
-            if (WebSocketServerRequest.Instance != null)
+            bool left = await LeaveTableViaGateway();
+            if (!left)
             {
-                await WebSocketServerRequest.Instance.LeaveTable();
+                Debug.LogWarning("Leave endpoint failed, disconnecting anyway");
             }
 
-            // Clean up
+            CleanupAfterLeave();
+        }
+
+        private async Task<bool> LeaveTableViaGateway()
+        {
+            var tableId = GameLiveData.instance?.tableId ?? "";
+            var userId = BootstrapLobbyAdapter.GetUserId();
+
+            var payload = new
+            {
+                session_id = tableId,
+                user_id = userId
+            };
+
+            Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Backend] POST /tgs/leave with payload: {JsonConvert.SerializeObject(payload)}");
+
+            try
+            {
+                Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Backend] Sending leave request to {TeenPattiRoutes.LeaveTable}");
+                var response = await ApiClient.Instance.Post<LeaveApiResponse>(TeenPattiRoutes.LeaveTable, payload);
+                if (response == null)
+                {
+                    Debug.LogError("Leave API returned null");
+                    return false;
+                }
+
+                string status = response.status;
+                Debug.Log($"Leave API response status: {status}");
+                return status == "cancelled" || status == "no_active_session";
+            }
+            catch (ApiException ex)
+            {
+                Debug.LogError($"Leave API failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        private void CleanupAfterLeave()
+        {
+            if (WebSocketClient.Instance != null)
+            {
+                _ = WebSocketClient.Instance.Disconnect();
+            }
+
+            isConnected = false;
             isInPrivateRoom = false;
             currentPrivateCode = "";
+            lastTableId = "";
+
+            if (GameLiveData.instance != null)
+            {
+                GameLiveData.instance.ResetGameData();
+                GameLiveData.instance.isSpectator = false;
+                GameLiveData.instance.rejoin = false;
+                GameLiveData.instance.isPrivateTable = false;
+                GameLiveData.instance.privateTableCode = "";
+            }
+
+            PlayerPrefs.DeleteKey("savedPrivateCode");
 
             MainThreadDispatcher.Enqueue(() =>
             {
-                // Return to lobby
                 if (TeenpattiLobby.instance != null)
                 {
                     TeenpattiLobby.instance.HideRoomPanel();
@@ -560,24 +752,18 @@ namespace Teenpatti
 
         public async void LeaveTable()
         {
-            Debug.Log("Leaving current table...");
+            Debug.Log("Leaving current table via gateway...");
 
-            if (WebSocketServerRequest.Instance != null)
+            bool left = await LeaveTableViaGateway();
+            Debug.Log($"Leave table response: {(left ? "success" : "failed")}");
+            if (!left)
             {
-                await WebSocketServerRequest.Instance.LeaveTable();
+                Debug.LogWarning("Leave endpoint failed, disconnecting anyway");
             }
+            Debug.Log("Disconnecting from WebSocket server...");
+            Loader.Instance.HideLoading();
 
-            // Clean up
-            GameLiveData.instance.ResetGameData();
-            isInPrivateRoom = false;
-            currentPrivateCode = "";
-            lastTableId = "";
-
-            // Return to lobby
-            MainThreadDispatcher.Enqueue(() =>
-            {
-                SceneManager.LoadScene("Lobby");
-            });
+            CleanupAfterLeave();
         }
 
         #endregion
@@ -678,6 +864,7 @@ namespace Teenpatti
 
         private void OnApplicationQuit()
         {
+            Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Lifecycle] OnApplicationQuit");
             Disconnect();
         }
 
@@ -711,60 +898,59 @@ namespace Teenpatti
 
         private void OnApplicationPause(bool pauseStatus)
         {
+            string ts = DateTime.Now.ToString("HH:mm:ss.fff");
             if (pauseStatus)
             {
-                Debug.Log("Application paused - starting grace period");
+                Debug.Log($"[{ts}] [Lifecycle] OnApplicationPause(true) - App backgrounded");
 
-                // Cancel any previous pending disconnect
                 _pauseCancelToken?.Cancel();
                 _pauseCancelToken = new CancellationTokenSource();
 
-                // Run async logic via your existing dispatcher pattern
                 MainThreadDispatcher.Enqueue(async () =>
                 {
                     try
                     {
                         if (GameLiveData.instance.isPrivateTable)
                         {
-                            PlayerPrefs.GetString("savedPrivateCode", GameLiveData.instance.privateTableCode);
+                            PlayerPrefs.SetString("savedPrivateCode", GameLiveData.instance.privateTableCode);
                         }
                         await Task.Delay(600000, _pauseCancelToken.Token);
 
-                        // Still paused after 10s — now disconnect
-                        Debug.Log("Grace period expired, disconnecting");
+                        Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Lifecycle] Grace period expired, disconnecting");
                         //Disconnect();
                     }
                     catch (TaskCanceledException)
                     {
-                        // Resumed within grace period — stay connected, do nothing
-                        Debug.Log("Resumed within grace period, staying connected");
+                        Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Lifecycle] Resumed within grace period, staying connected");
                     }
                 });
             }
             else
             {
-                Debug.Log("Application resumed - cancelling pending disconnect");
-
-                // Cancel the pending disconnect timer
+                Debug.Log($"[{ts}] [Lifecycle] OnApplicationPause(false) - App resumed");
                 _pauseCancelToken?.Cancel();
                 _pauseCancelToken = null;
 
                 MainThreadDispatcher.Enqueue(async () =>
                 {
-                    await Task.Delay(500); // small settle delay
+                    await Task.Delay(500);
+
+                    string wsStateStr = WebSocketClient.Instance?.websocket != null
+                        ? WebSocketClient.Instance.websocket.State.ToString()
+                        : "null";
+                    Debug.Log($"[{DateTime.Now:HH:mm:ss.fff}] [Resume] isConnected={isConnected}, WebSocketState={wsStateStr}");
 
                     if (!isConnected)
                     {
-                        Debug.Log("Was disconnected, rejoining...");
-                        //GameManager.Instance.OnLobby();
-                        //SceneManager.LoadScene(1);
+                        Debug.Log($"[{ts}] [Resume] Reconnect path: ReconnectAndRejoin()");
                         TeenpattiGameDataLobby.createTable = false;
                         TeenpattiGameDataLobby.isRejoin = true;
+                        GameLiveData.wasReconnectFromGateway = false;
                         await ReconnectAndRejoin();
                     }
                     else
                     {
-                        Debug.Log("Still connected, no action needed");
+                        Debug.Log($"[{ts}] [Resume] No reconnect attempted (isConnected=true)");
                     }
                 });
             }
@@ -772,32 +958,22 @@ namespace Teenpatti
 
         private async Task ReconnectAndRejoin()
         {
-            // Load saved state
-            string savedTableID = PlayerPrefs.GetString("savedTableID", "");
-            string savedPrivateCode = PlayerPrefs.GetString("savedPrivateCode", "");
-
-
-            await ConnectToServer();
-
-            if (!string.IsNullOrEmpty(savedTableID))
-            {
-                Debug.Log($"Rejoining saved table: {savedTableID}");
-                //await RejoinGame(savedTableID, userID);
-            }
-            else
-            {
-                Debug.Log("No saved table, going to lobby");
-                // navigate to lobby or whatever your normal flow is
-            }
+            await HandleReconnection();
         }
 
         public async void Disconnect()
         {
+            _reconnectCts?.Cancel();
+            _pauseCancelToken?.Cancel();
+            _pauseCancelToken = null;
+
             if (WebSocketClient.Instance != null)
             {
                 await WebSocketClient.Instance.Disconnect();
             }
             isConnected = false;
+            isReconnecting = false;
+            reconnectAttempts = 0;
             isInPrivateRoom = false;
             currentPrivateCode = "";
         }
@@ -852,10 +1028,30 @@ namespace Teenpatti
 
     class TeenPattiJoinRequest
     {
-        public int buyin { get; set; }
+        public long buyin { get; set; }
         public int boot_amount { get; set; }
         public string gameType { get; set; }
-        public string privateCode { get; set; }
+        public string private_code { get; set; }
         public string attemptID { get; set; }
+    }
+
+    class PrivateCreateApiResponse
+    {
+        public string private_code { get; set; }
+        public SessionData session { get; set; }
+    }
+
+    class SessionData
+    {
+        public string session_id { get; set; }
+        public string table_id { get; set; }
+        public string ws_url { get; set; }
+        public string ws_token { get; set; }
+        public string status { get; set; }
+    }
+
+    class LeaveApiResponse
+    {
+        public string status;
     }
 }

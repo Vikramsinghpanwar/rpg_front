@@ -519,7 +519,7 @@ public class ConnectionRummy : MonoBehaviour
     public void ReturnToLobby()
     {
 
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 
     public void DropWithLoss()

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using Core.Utils;
 
 public class PeopleBetKQ : MonoBehaviour
 {
@@ -75,7 +76,7 @@ public class PeopleBetKQ : MonoBehaviour
     public void WalletUpdate()
     {
         wallet = Random.Range(1000, 100000);
-        walletAmtText.text = "Rs. " + wallet.ToString();
+        walletAmtText.text = MoneyFormatter.FormatPaisa(wallet);
     }
     public void MoveAllcoinsBack()
     {

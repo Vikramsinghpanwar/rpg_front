@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using Core.Utils;
 
 
 
@@ -41,14 +42,14 @@ public class PLayerManagerBac : MonoBehaviour
 
                     p1Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[k];
                     p1Name.text = LoadOnlinePlayers.onlinePlayerSpritesList[k].name;
-                    p1WalletTxt.text = "₹" + Random.Range(15, 100) + "000";
+                    p1WalletTxt.text = MoneyFormatter.FormatPaisa((long)Random.Range(1500, 100000));
                     break;
                 case 1:
                     playerSeq[1] = k;
 
                     p2Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[k];
                     p2Name.text = LoadOnlinePlayers.onlinePlayerSpritesList[k].name;
-                    p2WalletTxt.text = "₹" + Random.Range(15, 100) + "000";
+                    p2WalletTxt.text = MoneyFormatter.FormatPaisa((long)Random.Range(1500, 100000));
 
                     break;
                 case 2:
@@ -56,7 +57,7 @@ public class PLayerManagerBac : MonoBehaviour
 
                     p3Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[k];
                     p3Name.text = LoadOnlinePlayers.onlinePlayerSpritesList[k].name;
-                    p3WalletTxt.text = "₹" + Random.Range(15, 100) + "000";
+                    p3WalletTxt.text = MoneyFormatter.FormatPaisa((long)Random.Range(1500, 100000));
 
                     break;
                 case 3:
@@ -64,7 +65,7 @@ public class PLayerManagerBac : MonoBehaviour
 
                     p4Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[k];
                     p4Name.text = LoadOnlinePlayers.onlinePlayerSpritesList[k].name;
-                    p4WalletTxt.text = "₹" + Random.Range(15, 100) + "000";
+                    p4WalletTxt.text = MoneyFormatter.FormatPaisa((long)Random.Range(1500, 100000));
 
                     break;
 
@@ -73,7 +74,7 @@ public class PLayerManagerBac : MonoBehaviour
 
                     p5Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[k];
                     p5Name.text = LoadOnlinePlayers.onlinePlayerSpritesList[k].name;
-                    p5WalletTxt.text = "₹" + Random.Range(15, 100) + "000";
+                    p5WalletTxt.text = MoneyFormatter.FormatPaisa((long)Random.Range(1500, 100000));
 
                     break;
 
@@ -82,7 +83,7 @@ public class PLayerManagerBac : MonoBehaviour
 
                     p6Img.sprite = LoadOnlinePlayers.onlinePlayerSpritesList[k];
                     p6Name.text = LoadOnlinePlayers.onlinePlayerSpritesList[k].name;
-                    p6WalletTxt.text = "₹" + Random.Range(15, 100) + "000";
+                    p6WalletTxt.text = MoneyFormatter.FormatPaisa((long)Random.Range(1500, 100000));
 
                     break;
             }

@@ -14,7 +14,7 @@ public class TeenpattiGameDataLobby : MonoBehaviour
 
     void Awake()
     {
-        if(Instance != this)
+        if (Instance == null)
         {
             Instance = this;
         }

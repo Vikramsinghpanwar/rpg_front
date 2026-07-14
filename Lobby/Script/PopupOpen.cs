@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -5,9 +6,11 @@ using UnityEngine.UI;
 
 public class PopupOpen : MonoBehaviour
 {
+    public static event System.Action<Image> OnPopupOpened;
+
     public Animator refreshAnimator;
-    public Sprite  musicOn,  soundOn;
-    public Sprite  musicOff,  soundOff;
+    public Sprite musicOn, soundOn;
+    public Sprite musicOff, soundOff;
     public AudioSource audioBackbground;
     public AudioSource audioSound;
 
@@ -19,13 +22,14 @@ public class PopupOpen : MonoBehaviour
 
     public bool SoundOn;
     public bool MusicOnOff;
-    void Start(){
+    void Start()
+    {
         audioBackbground.Play();
         LobbyImage.gameObject.SetActive(true);
         ProfileImage.gameObject.SetActive(false);
         SoundOn = true;
         MusicOnOff = false;
-        if(PlayerPrefs.GetInt("isFirstTime") != 22)
+        if (PlayerPrefs.GetInt("isFirstTime") != 22)
         {
             PlayerPrefs.SetInt("isMusicOn", 1);
             PlayerPrefs.SetInt("isSoundOn", 1);
@@ -33,11 +37,11 @@ public class PopupOpen : MonoBehaviour
             music.sprite = musicOn;
             sound.sprite = soundOn;
         }
-        if(PlayerPrefs.GetInt("isMusicOn") == 1)
+        if (PlayerPrefs.GetInt("isMusicOn") == 1)
         {
             //PlayingBackground();
-            if(music != null)
-            music.sprite = musicOn;
+            if (music != null)
+                music.sprite = musicOn;
             audioBackbground.volume = 1f;
         }
         else
@@ -63,25 +67,31 @@ public class PopupOpen : MonoBehaviour
 
         }
     }
-    
-    public void OpenPopup(Image imageName){
+
+    public void OpenPopup(Image imageName)
+    {
         imageName.gameObject.SetActive(true);
+        OnPopupOpened?.Invoke(imageName);
         TuSound();
     }
-    public void HidePopup(Image imageName){
-        imageName.gameObject.SetActive(false); 
-        TuSound();       
+    public void HidePopup(Image imageName)
+    {
+        imageName.gameObject.SetActive(false);
+        TuSound();
     }
 
     public void StopBackgroundMusic(Image NewMusic)
     {
-        if (audioBackbground.isPlaying){
+        if (audioBackbground.isPlaying)
+        {
             NewMusic.sprite = musicOff;
             MusicOnOff = false;
             PlayerPrefs.SetInt("isMusicOn", 0);
             TuMusic();
             music.sprite = musicOff;
-        }else{
+        }
+        else
+        {
             NewMusic.sprite = musicOn;
             MusicOnOff = true;
             PlayerPrefs.SetInt("isMusicOn", 1);
@@ -89,21 +99,26 @@ public class PopupOpen : MonoBehaviour
             music.sprite = musicOn;
         }
     }
-    public void TuMusic(){
-        if(MusicOnOff == true){
+    public void TuMusic()
+    {
+        if (MusicOnOff == true)
+        {
             audioBackbground.Play();
-        }else{
+        }
+        else
+        {
             audioBackbground.Stop();
         }
     }
-    public void PlayingBackground(){
+    public void PlayingBackground()
+    {
         MusicOnOff = true;
         TuMusic();
     }
 
     public void StopSoundS()
     {
-        if(SoundOn)
+        if (SoundOn)
         {
             ToggleImage.sprite = soundOff;
             SoundOn = false;
@@ -118,8 +133,10 @@ public class PopupOpen : MonoBehaviour
             sound.sprite = soundOn;
         }
     }
-    public void TuSound(){
-        if(SoundOn){
+    public void TuSound()
+    {
+        if (SoundOn)
+        {
             audioSound.Play();
         }
     }
@@ -127,7 +144,7 @@ public class PopupOpen : MonoBehaviour
 
     public void MusicToggle()
     {
-        if(PlayerPrefs.GetInt("isMusicOn") == 1)
+        if (PlayerPrefs.GetInt("isMusicOn") == 1)
         {
             //music is on set it to off
             music.sprite = musicOff;
@@ -143,7 +160,7 @@ public class PopupOpen : MonoBehaviour
 
         }
     }
-    
+
 
     public void SoundToggle()
     {
@@ -164,7 +181,7 @@ public class PopupOpen : MonoBehaviour
 
         }
     }
-    
+
     public void Refresh()
     {
         refreshAnimator.SetBool("_is", true);

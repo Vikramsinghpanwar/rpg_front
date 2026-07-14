@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Core.Utils;
 
 public class CP_histroy : MonoBehaviour{
     public Color purple;
@@ -48,7 +49,7 @@ public class CP_histroy : MonoBehaviour{
                 StatusUpdate.text = "Congratulations";
                 StatusUpdate2.text = "Bonus";
                 ChangeWinPopup.sprite = WinPopup;
-                WinningAmount.text = "₹ " +winn.ToString("00");
+                WinningAmount.text = MoneyFormatter.FormatPaisa((long)(winn * 100));
             }else{
                 StatusUpdate2.text = "Loss";
                 ChangeWinPopup.sprite = LosePopup;
@@ -61,7 +62,7 @@ public class CP_histroy : MonoBehaviour{
             Invoke("HideWinPopup", 3F);
         }
         GameIdShow.text = gameid.ToString();
-        UserWalletShow.text = "₹"+  responseData.wallet.ToString("N2");
+        UserWalletShow.text = MoneyFormatter.FormatPaisa((long)(responseData.wallet * 100));
     }
 
 

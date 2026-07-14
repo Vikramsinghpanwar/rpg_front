@@ -74,10 +74,10 @@ public class ManagerMines : MonoBehaviour
     }
 
     // Update is called once per frame
-  
+
     public void AddMines()
     {
-        if(minesCount < 24)
+        if (minesCount < 24)
         {
             mineBoxContainer.GetChild(minesCount - 2).gameObject.SetActive(false);
             minesCount++;
@@ -92,7 +92,7 @@ public class ManagerMines : MonoBehaviour
     void BoxNum_TextHandler()
     {
         int num = 1;
-        for(int i = 0; i<mineBoxContainer.childCount; i++)
+        for (int i = 0; i < mineBoxContainer.childCount; i++)
         {
             GameObject t = mineBoxContainer.GetChild(i).gameObject;
             if (t.activeInHierarchy)
@@ -102,7 +102,7 @@ public class ManagerMines : MonoBehaviour
             }
         }
     }
-  
+
     public void SetMultiplierInGame(int mineCnt)
     {
         float NxtMultiplier = multiplierRef.rewardMultipliers[minesCount - 1 + mineCnt];
@@ -114,7 +114,7 @@ public class ManagerMines : MonoBehaviour
         YouWinTxt.text = (bManagerScript.totalBetAmt * YouMultiplier).ToString();
         NextWinTxt.text = (bManagerScript.totalBetAmt * NxtMultiplier).ToString();
 
-        winningAmnt = YouMultiplier* bManagerScript.totalBetAmt;
+        winningAmnt = YouMultiplier * bManagerScript.totalBetAmt;
     }
 
 
@@ -122,7 +122,7 @@ public class ManagerMines : MonoBehaviour
 
     public void SetMultipliersOnPlaceBet()
     {
-        float NxtMultiplier = multiplierRef.rewardMultipliers[minesCount -2];
+        float NxtMultiplier = multiplierRef.rewardMultipliers[minesCount - 2];
 
         NextWinMultiplierTxt.text = NxtMultiplier.ToString() + "X";
 
@@ -137,7 +137,7 @@ public class ManagerMines : MonoBehaviour
             minesCount--;
             mineCountTxt.text = minesCount.ToString();
             SetMultipliersOnPlaceBet();
-            mineBoxContainer.GetChild(minesCount-2).gameObject.SetActive(true);
+            mineBoxContainer.GetChild(minesCount - 2).gameObject.SetActive(true);
             BoxNum_TextHandler();
             //multiplierRef.UpdateMultipliers(minesCount);
 
@@ -148,9 +148,9 @@ public class ManagerMines : MonoBehaviour
     {
         betRoda.SetActive(false);
 
-        for (int i =0; i<hiddenObjects.Length; i++)
+        for (int i = 0; i < hiddenObjects.Length; i++)
         {
-            for(int y = 0; y< hiddenObjects.Length; y++)
+            for (int y = 0; y < hiddenObjects.Length; y++)
             {
                 hiddenObjects[i][y].sprite = gold;
             }
@@ -162,7 +162,7 @@ public class ManagerMines : MonoBehaviour
     }
     public void SetMines()
     {
-        for(int i = 0; i<5; i++)
+        for (int i = 0; i < 5; i++)
         {
             for (int j = 0; j < 5; j++)
             {
@@ -175,7 +175,7 @@ public class ManagerMines : MonoBehaviour
         int tx, ty;
         List<int[]> exVal = new List<int[]>();
         exVal.Clear();
-        for(int i =0;i<minesCount - 1; i++)
+        for (int i = 0; i < minesCount - 1; i++)
         {
             do
             {
@@ -189,12 +189,12 @@ public class ManagerMines : MonoBehaviour
             Debug.Log("tx : " + tx + " and ty : " + ty);
         }
 
-        for(int i = 0; i< 5; i++)
+        for (int i = 0; i < 5; i++)
         {
-            for (int j = 0; j< 5; j++)
+            for (int j = 0; j < 5; j++)
             {
                 string s;
-                if(hiddenObjects[i][j].sprite != null)
+                if (hiddenObjects[i][j].sprite != null)
                 {
                     if (hiddenObjects[i][j].sprite.name != "mine")
                     {
@@ -235,13 +235,13 @@ public class ManagerMines : MonoBehaviour
         minusBtn.interactable = false;
         winningBox = 0;
         winningAmnt = 0;
-        if(bManagerScript.totalBetAmt > 0)
+        if (bManagerScript.totalBetAmt > 0)
         {
             betRoda.SetActive(true);
             bManagerScript.walletAmt -= bManagerScript.totalBetAmt;
             Wallet.DeductAmount(bManagerScript.totalBetAmt);
             bManagerScript.walletTxt.text = "₹ " + bManagerScript.walletAmt.ToString("F2");
-            SpinBtn.interactable =false;
+            SpinBtn.interactable = false;
             dbRef.SaveGameHistoryDatabase(periodId, "Mines", bManagerScript.totalBetAmt);
             _cashOut = false;
             SetMines();
@@ -252,17 +252,17 @@ public class ManagerMines : MonoBehaviour
         }
     }
 
-    
+
 
     public void CashOut()
-    {        
+    {
         _cashOut = true;
         CashoutBtn.SetActive(false);
         SpinBtn.interactable = false;
         winningAmnt = bManagerScript.totalBetAmt * (YouMultiplier);
         Wallet.DeductFromPool(winningAmnt);
         bManagerScript.UpdateWallet(winningAmnt);
-        dbRef.UpdateGameHistory(periodId,winningAmnt);
+        dbRef.UpdateGameHistory(periodId, winningAmnt);
 
         Reset();
     }
@@ -280,7 +280,7 @@ public class ManagerMines : MonoBehaviour
 
         YouWinTxt.text = (bManagerScript.totalBetAmt * YouMultiplier).ToString();
         NextWinTxt.text = (bManagerScript.totalBetAmt * NxtMultiplier).ToString();
-      
+
         RoundCompleted();
     }
 
@@ -314,7 +314,7 @@ public class ManagerMines : MonoBehaviour
 
     public void Lobby()
     {
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 
 
@@ -326,7 +326,7 @@ public class ManagerMines : MonoBehaviour
             return;
         }
 
-      
+
         if (block.GetChild(0).gameObject.GetComponent<Image>().sprite.name == "mine")
         {
 
@@ -379,7 +379,7 @@ public class ManagerMines : MonoBehaviour
         }
         else
         {
-            if(winningBox == 0)
+            if (winningBox == 0)
             {
                 CashoutBtn.GetComponent<Button>().interactable = true;
             }
@@ -420,10 +420,10 @@ public class ManagerMines : MonoBehaviour
                 block.GetChild(0).gameObject.GetComponent<Image>().sprite = mine;
             }
         }
-            
-      
-       if(block.GetChild(0).gameObject.GetComponent<Image>().sprite.name == "mine")
-       {
+
+
+        if (block.GetChild(0).gameObject.GetComponent<Image>().sprite.name == "mine")
+        {
             //bomb
             CashoutBtn.SetActive(false);
             Wallet.AddToPool(bManagerScript.totalBetAmt);
@@ -435,7 +435,7 @@ public class ManagerMines : MonoBehaviour
 
         }
         else
-       {
+        {
             if (block.GetChild(1).gameObject.activeInHierarchy)
             {
                 block.GetChild(1).gameObject.SetActive(false);

@@ -4,43 +4,60 @@ using UnityEngine;
 using UnityEngine.UI;
 using Features.Recharge.Controllers;
 using Features.Recharge.Models;
+using Features.Recharge.Utils;
 using Core.Managers;
+using Core.Bootstrap;
+using Core.Utils;
+using Features.Lobby.UI;
 
 namespace Features.Recharge.UI
 {
-    // Drop this prefab into a scene, wire the SerializeFields, press Play.
-    // Auth/ApiClient/LoadingManager/PopupManager are bootstrapped by Core before any scene loads.
     public class RechargeScreen : MonoBehaviour
     {
         [Header("Controller")]
-        [Tooltip("Assign in inspector. Falls back to FindObjectOfType then auto-creates if missing.")]
         [SerializeField] private RechargeController controller;
 
         [Header("Layout")]
         [SerializeField] private Transform amountContainer;
-        [SerializeField] private Transform gatewayContainer;
         [SerializeField] private GameObject amountButtonPrefab;
-        [SerializeField] private GameObject gatewayButtonPrefab;
+
+        [Header("Amount Display")]
+        [SerializeField] private TMP_Text amountSelectedText;
+        [SerializeField] private TMP_Text bonusSelectedText;
+        [SerializeField] private TMP_Text totalReceiveText;
 
         [Header("Buttons")]
-        [SerializeField] private Button rechargeButton;
+        [SerializeField] private Button continueButton;
         [SerializeField] private Button rechargeToggle_button;
         [SerializeField] private Button closeButton;
         [SerializeField] private Button refreshButton;
         [SerializeField] private Button historyButton;
+        [SerializeField] private RefreshButtonAnimator refreshButtonAnimator;
+
+        [Header("Toggle Sprites")]
+        [SerializeField] private Sprite selectedSprite;
+        [SerializeField] private Sprite unselectedSprite;
+        [SerializeField] private Image rechargeToggleImage;
+        [SerializeField] private Image historyToggleImage;
+
+        [Header("Custom Amount")]
+        [SerializeField] private TMP_InputField customAmountInput;
+
+        [Header("Gateway Popup")]
+        [SerializeField] private RechargeGatewayPopup gatewayPopup;
 
         [Header("Status")]
         [SerializeField] private TMP_Text errorText;
 
         [Header("History Screen")]
-        [Tooltip("Optional. If assigned, History button opens this prefab; otherwise it tries Resources.")]
         [SerializeField] private GameObject historyScreen;
         [SerializeField] private GameObject rechargeScreen;
 
         RechargeAmountPreset selectedAmount;
-        GatewayInfo selectedGateway;
+        long customAmountPaisa;
+        long customBonusPaisa;
+        bool _suppressCustomAmountEvent;
         readonly List<RechargeAmountButton> amountButtons = new List<RechargeAmountButton>();
-        readonly List<RechargeGatewayButton> gatewayButtons = new List<RechargeGatewayButton>();
 
         void Awake()
         {
@@ -52,60 +69,69 @@ namespace Features.Recharge.UI
             }
 
             if (closeButton != null) closeButton.onClick.AddListener(Close);
-            if (refreshButton != null) refreshButton.onClick.AddListener(() => _ = controller.LoadGateways());
-            if (rechargeButton != null) rechargeButton.onClick.AddListener(OnRechargeClicked);
+            if (refreshButton != null) refreshButton.onClick.AddListener(OnRefreshClicked);
+            if (continueButton != null) continueButton.onClick.AddListener(OnContinueClicked);
             if (rechargeToggle_button != null) rechargeToggle_button.onClick.AddListener(OpenRechargeScreen);
             if (historyButton != null) historyButton.onClick.AddListener(OpenHistory);
 
-            controller.OnGatewaysLoaded += OnGatewaysLoaded;
+            if (gatewayPopup != null)
+            {
+                gatewayPopup.OnPaid += OnPaidFromPopup;
+                gatewayPopup.OnClosed += OnGatewayPopupClosed;
+            }
+
             controller.OnAmountsLoaded += OnAmountsLoaded;
             controller.OnRechargeCreated += OnRechargeCreated;
             controller.OnError += OnError;
+            controller.OnGatewaysLoaded += OnGatewaysLoaded;
+            BootstrapService.Instance.OnBootstrapUpdated += OnBootstrapUpdated;
+
+            if (customAmountInput != null)
+            {
+                customAmountInput.contentType = TMP_InputField.ContentType.IntegerNumber;
+                customAmountInput.onValueChanged.AddListener(OnCustomAmountChanged);
+            }
         }
 
         void OnEnable()
         {
-            if (controller.GetGateways().Count == 0) _ = controller.LoadGateways();
-            else OnGatewaysLoaded(controller.GetGateways());
+            ResetToDefaultTab();
+            selectedAmount = null;
+            if (customAmountInput != null)
+            {
+                _suppressCustomAmountEvent = true;
+                customAmountInput.text = "";
+                _suppressCustomAmountEvent = false;
+            }
+            customAmountPaisa = 0;
+            customBonusPaisa = 0;
+            if (errorText != null) errorText.gameObject.SetActive(false);
+            if (continueButton != null) continueButton.interactable = false;
 
             OnAmountsLoaded(controller.GetDefaultAmounts());
-
-            selectedAmount = null;
-            selectedGateway = null;
-            if (errorText != null) errorText.gameObject.SetActive(false);
+            UpdateAmountDisplay();
         }
 
         void OnDestroy()
         {
             if (controller == null) return;
-            controller.OnGatewaysLoaded -= OnGatewaysLoaded;
             controller.OnAmountsLoaded -= OnAmountsLoaded;
             controller.OnRechargeCreated -= OnRechargeCreated;
             controller.OnError -= OnError;
-        }
+            controller.OnGatewaysLoaded -= OnGatewaysLoaded;
+            BootstrapService.Instance.OnBootstrapUpdated -= OnBootstrapUpdated;
 
-        void OnGatewaysLoaded(List<GatewayInfo> gateways)
-        {
-            foreach (var b in gatewayButtons) if (b != null) Destroy(b.gameObject);
-            gatewayButtons.Clear();
-            if (gatewayContainer == null || gatewayButtonPrefab == null) return;
-
-            foreach (var gateway in gateways)
+            if (gatewayPopup != null)
             {
-                if (gateway.status != "active") continue;
-                if (!gateway.enabled_lobby && !gateway.enabled_ingame) continue;
-
-                var go = Instantiate(gatewayButtonPrefab, gatewayContainer);
-                var btn = go.GetComponent<RechargeGatewayButton>();
-                if (btn == null) btn = go.AddComponent<RechargeGatewayButton>();
-                btn.Setup(gateway, SelectGateway);
-                gatewayButtons.Add(btn);
+                gatewayPopup.OnPaid -= OnPaidFromPopup;
+                gatewayPopup.OnClosed -= OnGatewayPopupClosed;
             }
 
-            if (gatewayButtons.Count > 0 && selectedGateway == null)
-            {
-                SelectGateway(gatewayButtons[0].Gateway);
-            }
+            if (refreshButtonAnimator != null)
+                refreshButtonAnimator.ForceStop();
+
+            if (customAmountInput != null)
+                customAmountInput.onValueChanged.RemoveListener(OnCustomAmountChanged);
         }
 
         void OnAmountsLoaded(List<RechargeAmountPreset> amounts)
@@ -113,6 +139,20 @@ namespace Features.Recharge.UI
             foreach (var a in amountButtons) if (a != null) Destroy(a.gameObject);
             amountButtons.Clear();
             if (amountContainer == null || amountButtonPrefab == null) return;
+
+            if (amounts == null || amounts.Count == 0)
+            {
+                if (errorText != null)
+                {
+                    errorText.text = "Recharge presets unavailable. Please try again later.";
+                    errorText.gameObject.SetActive(true);
+                }
+                if (continueButton != null) continueButton.interactable = false;
+                UpdateAmountDisplay();
+                return;
+            }
+
+            amounts.Sort((a, b) => a.amount_paisa.CompareTo(b.amount_paisa));
 
             foreach (var amount in amounts)
             {
@@ -125,48 +165,163 @@ namespace Features.Recharge.UI
                 }
             }
 
-            if (amountButtons.Count > 0 && selectedAmount == null) amountButtons[0].Select();
+            if (amountButtons.Count > 0 && selectedAmount == null && customAmountPaisa == 0)
+            {
+                amountButtons[0].Select();
+            }
+            else
+            {
+                UpdateAmountDisplay();
+            }
         }
 
-        void SelectGateway(GatewayInfo gateway)
+        void OnBootstrapUpdated(Core.Models.BootstrapResponse resp)
         {
-            selectedGateway = gateway;
-            foreach (var b in gatewayButtons) b.SetSelected(b.Gateway?.id == gateway.id);
+            controller.RefreshAmountsFromBootstrap();
+            OnAmountsLoaded(controller.GetDefaultAmounts());
+            if (customAmountPaisa > 0)
+            {
+                var presets = controller != null ? controller.GetDefaultAmounts() : null;
+                customBonusPaisa = RechargeBonusCalculator.GetApplicableBonus(customAmountPaisa, presets);
+                UpdateAmountDisplay();
+            }
+        }
+
+        void OnCustomAmountChanged(string value)
+        {
+            if (_suppressCustomAmountEvent) return;
+
+            string cleaned = value?.Replace(",", "") ?? "";
+            if (long.TryParse(cleaned, out long rupees) && rupees > 0)
+            {
+                customAmountPaisa = rupees * 100;
+            }
+            else
+            {
+                customAmountPaisa = 0;
+            }
+
+            selectedAmount = null;
+            foreach (var btn in amountButtons) btn.SetSelected(false);
+
+            var presets = controller != null ? controller.GetDefaultAmounts() : null;
+            customBonusPaisa = RechargeBonusCalculator.GetApplicableBonus(customAmountPaisa, presets);
+
+            UpdateAmountDisplay();
+            ValidateContinueButton();
+        }
+
+        void ValidateContinueButton()
+        {
+            if (continueButton != null)
+                continueButton.interactable = selectedAmount != null || customAmountPaisa > 0;
         }
 
         public void SelectAmount(RechargeAmountPreset amount, RechargeAmountButton button)
         {
             selectedAmount = amount;
-            foreach (var btn in amountButtons) btn.SetSelected(btn == button);
-        }
-
-        async void OnRechargeClicked()
-        {
-            if (selectedAmount == null) { ShowInlineError("Please select an amount"); return; }
-            if (selectedGateway == null) { ShowInlineError("Please select a payment method"); return; }
-
-            var url = await controller.CreateRecharge(selectedAmount.amount_paisa, selectedGateway.id);
-            if (!string.IsNullOrEmpty(url))
+            if (customAmountInput != null)
             {
-                Application.OpenURL(url);
-                Close();
+                _suppressCustomAmountEvent = true;
+                customAmountInput.text = "";
+                _suppressCustomAmountEvent = false;
             }
+            customAmountPaisa = 0;
+            customBonusPaisa = 0;
+            foreach (var btn in amountButtons) btn.SetSelected(btn == button);
+            UpdateAmountDisplay();
+            ValidateContinueButton();
         }
+
+        void UpdateAmountDisplay()
+        {
+            long amountPaisa = selectedAmount != null ? selectedAmount.amount_paisa : customAmountPaisa;
+            long bonusPaisa = selectedAmount != null ? selectedAmount.bonus_amount_paisa : customBonusPaisa;
+
+            string amountStr = "";
+            string bonusStr = "";
+            string totalStr = "";
+
+            if (amountPaisa > 0)
+            {
+                amountStr = MoneyFormatter.FormatPaisaRoundedRupees(amountPaisa);
+                bonusStr = bonusPaisa > 0
+                    ? $"+{MoneyFormatter.FormatPaisaRoundedRupees(bonusPaisa)} bonus"
+                    : "";
+                totalStr = MoneyFormatter.FormatPaisaRoundedRupees(amountPaisa + bonusPaisa);
+            }
+
+            if (amountSelectedText != null) amountSelectedText.text = amountStr;
+            if (bonusSelectedText != null) bonusSelectedText.text = bonusStr;
+            if (totalReceiveText != null) totalReceiveText.text = totalStr;
+        }
+
+        async void OnContinueClicked()
+        {
+            long currentAmount = selectedAmount != null ? selectedAmount.amount_paisa : customAmountPaisa;
+            if (currentAmount <= 0)
+            {
+                ShowInlineError("Please select an amount first");
+                return;
+            }
+
+            OpenGatewayPopup();
+        }
+
+        void OpenGatewayPopup()
+        {
+            if (gatewayPopup == null) return;
+
+            long amount = selectedAmount != null ? selectedAmount.amount_paisa : customAmountPaisa;
+            gatewayPopup.SetAmount(amount);
+            gatewayPopup.gameObject.SetActive(true);
+            gatewayPopup.transform.SetAsLastSibling();
+        }
+
+        void OnPaidFromPopup()
+        {
+            Close();
+        }
+
+        void OnGatewayPopupClosed()
+        {
+        }
+
         async void OpenRechargeScreen()
         {
             historyScreen?.SetActive(false);
             rechargeScreen?.SetActive(true);
+            if (historyToggleImage != null && unselectedSprite != null) historyToggleImage.sprite = unselectedSprite;
+            if (rechargeToggleImage != null && selectedSprite != null) rechargeToggleImage.sprite = selectedSprite;
         }
 
         void OnRechargeCreated(CreateRechargeResponse response)
         {
+            long bonus = response.bonus_amount > 0 ? response.bonus_amount : 0;
+            string bonusStr = bonus > 0 ? $"\nBonus: {RechargeController.FormatAmount(bonus)}" : "";
+            string totalStr = bonus > 0 ? $"\nTotal credited: {RechargeController.FormatAmount(response.amount + bonus)}" : "";
             PopupManager.Instance?.Show(
                 "Recharge Initiated",
-                $"Your recharge of {RechargeController.FormatAmount(response.amount)} has been initiated. Complete payment in the browser.",
+                $"Your recharge of {RechargeController.FormatAmount(response.amount)} has been initiated. Complete payment in the browser.{bonusStr}{totalStr}",
                 "OK");
         }
 
-        void OnError(string code, string message) => ShowInlineError(message);
+        void OnRefreshClicked()
+        {
+            refreshButtonAnimator?.StartSpin();
+            _ = controller.LoadGateways();
+        }
+
+        void OnGatewaysLoaded(List<GatewayInfo> gateways)
+        {
+            refreshButtonAnimator?.StopSpin();
+        }
+
+        void OnError(string code, string message)
+        {
+            ShowInlineError(message);
+            refreshButtonAnimator?.StopSpin();
+        }
 
         void ShowInlineError(string message)
         {
@@ -192,9 +347,18 @@ namespace Features.Recharge.UI
         {
             historyScreen?.SetActive(true);
             rechargeScreen?.SetActive(false);
+            if (rechargeToggleImage != null && unselectedSprite != null) rechargeToggleImage.sprite = unselectedSprite;
+            if (historyToggleImage != null && selectedSprite != null) historyToggleImage.sprite = selectedSprite;
             historyScreen = historyScreen ?? Resources.Load<GameObject>("RechargeHistoryScreen");
+
+            _ = controller.FetchHistory(true);
         }
 
-        void Close() => Destroy(gameObject);
+        void ResetToDefaultTab()
+        {
+            OpenRechargeScreen();
+        }
+
+        void Close() => gameObject?.SetActive(false);
     }
 }

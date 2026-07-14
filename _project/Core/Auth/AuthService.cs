@@ -17,18 +17,18 @@ namespace Core.Auth
                 new OtpRequestBody { Mobile = mobile, Channel = channel });
         }
 
-        public static Task<PlayerLoginResponse> VerifyOtp(string challengeId, string code, DeviceInfo device = null)
+        public static Task<PlayerLoginResponse> VerifyOtp(string challengeId, string code, DeviceInfo device = null, string promoCode = null)
         {
             return ApiClient.Instance.Post<PlayerLoginResponse>(
                 AuthRoutes.LoginOtpVerify,
-                new OtpVerifyBody { ChallengeId = challengeId, Code = code, Device = device ?? CurrentDevice() });
+                new OtpVerifyBody { ChallengeId = challengeId, Code = code, Device = device ?? CurrentDevice(), PromoCode = promoCode });
         }
 
-        public static Task<PlayerLoginResponse> LoginWithGoogle(string idToken, DeviceInfo device = null)
+        public static Task<PlayerLoginResponse> LoginWithGoogle(string idToken, DeviceInfo device = null, string promoCode = null)
         {
             return ApiClient.Instance.Post<PlayerLoginResponse>(
                 AuthRoutes.LoginGoogle,
-                new GoogleLoginBody { IdToken = idToken, Device = device ?? CurrentDevice() });
+                new GoogleLoginBody { IdToken = idToken, Device = device ?? CurrentDevice(), PromoCode = promoCode });
         }
 
         public static Task<TokenPair> Refresh(string refreshToken)

@@ -6,6 +6,8 @@ using UnityEngine.UI;
 using TMPro;
 using System.Text;
 using System.Security.Cryptography;
+using Core.Utils;
+using Core.Bootstrap;
 
 public class Manager7UD : MonoBehaviour
 {
@@ -67,6 +69,7 @@ public class Manager7UD : MonoBehaviour
     public GameObject betStartPanel;
     public Text walletText;
     float walletAmount;
+    private bool _resultAnimationComplete;
     public int totalBidAmount;
     public int betNumber, betAmount1, betAmount2, betAmount3;
     public Text winnerText;
@@ -74,7 +77,6 @@ public class Manager7UD : MonoBehaviour
     public bool betOn1, betOn2, betOn3;
     // Start is called before the first frame update
     public RandomHistory7UD historyGeneratorRef;
-    APIs apisRef;
 
     SocketManager7UD socketManagerRef;
     TableBotManager botManagerRef;
@@ -85,7 +87,7 @@ public class Manager7UD : MonoBehaviour
     public AudioSource effect_AudioSource;
     public void ExitGame()
     {
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 
     private void Update()
@@ -103,9 +105,7 @@ public class Manager7UD : MonoBehaviour
     private void Start()
     {
         botManagerRef = FindObjectOfType<TableBotManager>();
-        apisRef = FindObjectOfType<APIs>();
         socketManagerRef = FindObjectOfType<SocketManager7UD>();
-        apisRef.OnWalletFetched += UpdateWallet;
         waitingForNextRound_Panel.SetActive(false);
         countDown.SetActive(false);
         winPanel.SetActive(false);
@@ -113,18 +113,23 @@ public class Manager7UD : MonoBehaviour
         historyRef = FindObjectOfType<RandomHistory7UD>();
         notEnoughCashPanel.SetActive(false);
         betManagerRef = FindObjectOfType<BetManager>();
-        // burstScript = FindObjectOfType<Burst7UpDown>();
         distributorRef = FindObjectOfType<DistributorSingleWin>();
-        apisRef.FetchWallet();
-
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
     }
 
 
-    private void UpdateWallet(float wAmount)
+    public void UpdateWallet(float wAmount)
     {
         walletAmount = wAmount;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
     }
+
+    public void BeginResultProcessing()
+    {
+        _resultAnimationComplete = false;
+    }
+
+    public bool IsResultAnimationComplete => _resultAnimationComplete;
 
 
     public void CheckForPendingBets()
@@ -275,7 +280,7 @@ public class Manager7UD : MonoBehaviour
         betStopsPanel.SetActive(false);
         betStartPanel.SetActive(false);
         totalBidAmount = 0;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
         BetAmountIncrease(startTime, seeds);
 
         StartCoroutine(DiceChaal(val));
@@ -391,9 +396,9 @@ public class Manager7UD : MonoBehaviour
             int l = (randomValue2 * 70);
             int m = (randomValue3 * 990);
 
-            betAmount1Text.text = $"<color=yellow>{betAmount1}</color><color=#02ccfe>/{k}</color>";
-            betAmount2Text.text = $"<color=yellow>{betAmount3}</color><color=#02ccfe>/{l}</color>";
-            betAmount3Text.text = $"<color=yellow>{betAmount2}</color><color=#02ccfe>/{m}</color>";
+            betAmount1Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmount1)}</color><color=#02ccfe>/{k}</color>";
+            betAmount2Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmount2)}</color><color=#02ccfe>/{l}</color>";
+            betAmount3Text.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmount3)}</color><color=#02ccfe>/{m}</color>";
 
             yield return new WaitForSeconds(updateInterval);
         }
@@ -464,10 +469,10 @@ public class Manager7UD : MonoBehaviour
     }
     public void ClearAllBets()
     {
-        if(betAmount1 <= 0 && betAmount2 <= 0 && betAmount3 <= 0) return;
+        if (betAmount1 <= 0 && betAmount2 <= 0 && betAmount3 <= 0) return;
 
         walletAmount += betAmount1 + betAmount2 + betAmount3;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
 
         betAmount1 = betAmount2 = betAmount3 = 0;
         PlayerPrefs.SetInt("7ud_betsOnTie", betAmount3);
@@ -484,18 +489,18 @@ public class Manager7UD : MonoBehaviour
     Vector3 recentTouchPos;
     void Awake()
     {
-        if(Instance != this)
+        if (Instance != this)
         {
             Instance = this;
         }
-    }    
+    }
     public void RegisterTouch(Vector3 touch)
     {
         recentTouchPos = touch;
     }
     void ClearMyCoins()
     {
-        foreach(GameObject g in myCoinsList)
+        foreach (GameObject g in myCoinsList)
         {
             Destroy(g);
         }
@@ -503,24 +508,24 @@ public class Manager7UD : MonoBehaviour
     }
 
     void InstantiateCoin()
-    {        
+    {
         GameObject coin = Instantiate(TableBotManager.Instance.coinPrefabList[betManagerRef.betChipNum - 1], myCoinHolder);
         coin.transform.localScale = Vector3.one;
         coin.transform.position = recentTouchPos;
         myCoinsList.Add(coin);
         coin.transform.SetParent(myCoinHolder);
     }
-     
+
 
     public void Bet(int betOn)
     {
-        int val = betManagerRef.betVal;
+        int val = betManagerRef.betVal * 100;
 
         betNumber = 2;
         if (val <= walletAmount)
         {
             walletAmount -= val;
-            walletText.text = "₹" + walletAmount.ToString();
+            walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
             GameObject coin = null;
             socketManagerRef.SendBetDataToServer(betOn, val);
             PlayerPrefs.SetString("7ud_roundId", socketManagerRef.currentRoundId);
@@ -601,9 +606,8 @@ public class Manager7UD : MonoBehaviour
         if (winAmount > 0)
         {
             winPanel.SetActive(true);
-            winPanelTxt.text = "<size=36>You Win</size>\n₹" + winAmount.ToString("F2");
+            winPanelTxt.text = "<size=36>You Win</size>\n" + MoneyFormatter.FormatPaisa((long)winAmount);
             winAudio.Play();
-            apisRef.FetchWallet();
         }
 
         Invoke("WinPanelOff", 2);
@@ -644,6 +648,8 @@ public class Manager7UD : MonoBehaviour
         winner2.SetActive(false);
         winner3.SetActive(false);
         yield return new WaitForSeconds(1f);
+
+        _resultAnimationComplete = true;
 
         //StartCoroutine(Clock(4, true));
     }

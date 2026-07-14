@@ -7,7 +7,10 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine.SceneManagement;
 using SocketIOClient.Newtonsoft.Json;
+using System.Threading.Tasks;
+using Core.API;
 using Core.Config;
+using Core.Services;
 using Features.Lobby.Integration;
 
 public class SocketManagerRVS : MonoBehaviour
@@ -82,7 +85,7 @@ public class SocketManagerRVS : MonoBehaviour
         {
             Query = new Dictionary<string, string>
             {
-                {"token", "UNITY" }
+                {"token", TokenProvider.Instance?.AccessToken ?? string.Empty}
             },
             Transport = SocketIOClient.Transport.TransportProtocol.WebSocket
         });
@@ -255,20 +258,23 @@ public class SocketManagerRVS : MonoBehaviour
         // Parse the values from the JSON object
         string card = gameResult["resultCard"].ToString();
         manager.DisplayCard(card);
+        _ = CGSBetService.Instance.RefreshWalletAsync();
     }
     public void SendBetDataToServer(char betOn, float betAmount)
     {
-        Debug.Log("sending bet data : " + betOn + " bet amount : " + betAmount);
-        var data = new Dictionary<string, object>
-        {
-            {"userId", BootstrapLobbyAdapter.GetUserId()},
-            { "betOn", betOn },
-            { "betAmount", betAmount }
-        };
+        _ = SendBetAsync(betOn, betAmount);
+    }
 
-        string jsonData = JsonConvert.SerializeObject(data);
-        Debug.Log("json : " + jsonData);
-        socket.Emit("sendData", jsonData);
+    async Task SendBetAsync(char betOn, float betAmount)
+    {
+        try
+        {
+            await CGSBetService.Instance.PlaceBetAsync(CGSGameKeys.RedBlack, betOn.ToString(), (long)betAmount);
+        }
+        catch (ApiException ex)
+        {
+            Debug.LogWarning($"[SocketManagerRVS] Bet rejected: {ex.StatusCode} {ex.Message}");
+        }
     }
 
     public void SendGameStatusRequest()

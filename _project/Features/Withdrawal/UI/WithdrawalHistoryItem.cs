@@ -17,23 +17,23 @@ namespace Features.Withdrawal.UI
         [SerializeField] private TextMeshProUGUI netAmountText;
         [SerializeField] private Button cancelButton;
         [SerializeField] private Image statusBadge;
-        
+
         private WithdrawalItem _withdrawal;
         private WithdrawalController _controller;
-        
+
         public void Setup(WithdrawalItem withdrawal, WithdrawalController controller)
         {
             _withdrawal = withdrawal;
             _controller = controller;
-            
+
             amountText.text = MoneyFormatter.FormatPaisa(withdrawal.requested_amount);
             netAmountText.text = $"Net: {MoneyFormatter.FormatPaisa(withdrawal.net_payout_amount)}";
-            
+
             // Status
             string status = withdrawal.status;
             statusText.text = WithdrawalStatus.GetDisplayText(status);
             statusBadge.color = GetColorFromHex(WithdrawalStatus.GetBadgeColor(status));
-            
+
             // Date
             if (!string.IsNullOrEmpty(withdrawal.requested_at))
             {
@@ -46,14 +46,14 @@ namespace Features.Withdrawal.UI
                     dateText.text = withdrawal.requested_at;
                 }
             }
-            
+
             // Method
             methodText.text = withdrawal.payout_method ?? "N/A";
             if (!string.IsNullOrEmpty(withdrawal.masked_account))
             {
                 methodText.text += $" ({withdrawal.masked_account})";
             }
-            
+
             // Cancel button
             if (cancelButton != null)
             {
@@ -66,7 +66,7 @@ namespace Features.Withdrawal.UI
                 }
             }
         }
-        
+
         private void OnCancelClicked()
         {
             if (_controller == null || _withdrawal == null) return;
@@ -85,7 +85,7 @@ namespace Features.Withdrawal.UI
                     cancelButton.gameObject.SetActive(false);
                 });
         }
-        
+
         private Color GetColorFromHex(string hex)
         {
             if (ColorUtility.TryParseHtmlString(hex, out Color color))

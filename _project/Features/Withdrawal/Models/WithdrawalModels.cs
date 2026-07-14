@@ -10,8 +10,8 @@ namespace Features.Withdrawal.Models
         public string idempotency_key;
         public long amount;
         public string currency = "INR";
-        public string payout_method;
-        public Dictionary<string, string> account_details;
+        public string payout_type = "BANK";
+        // public Dictionary<string, string> account_details;
     }
 
     [Serializable]
@@ -63,6 +63,22 @@ namespace Features.Withdrawal.Models
         public string id;
         public string status;
         public string refund_transaction_id;
+    }
+
+    [Serializable]
+    public class SaveBankAccountRequest
+    {
+        public string account_holder_name;
+        public string bank_name;
+        public string account_number;
+        public string ifsc_code;
+    }
+
+    [Serializable]
+    public class SavePayoutMethodResponse
+    {
+        public bool success;
+        public Core.Models.SavedBankAccount data;
     }
 
     [Serializable]

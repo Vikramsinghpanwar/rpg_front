@@ -8,12 +8,12 @@ namespace Core.Utils
     // don't surprise us.
     public static class MoneyFormatter
     {
-        public static string FormatPaisa(long paisa, string currency = "INR")
+        public static string FormatPaisa(long paisa, string currency = "")
         {
             decimal rupees = paisa / 100m;
             return currency == "INR"
-                ? $"₹{rupees.ToString("F2", CultureInfo.InvariantCulture)}"
-                : $"{rupees.ToString("F2", CultureInfo.InvariantCulture)} {currency}";
+                ? $"₹{rupees.ToString("N2", CultureInfo.InvariantCulture)}"
+                : $"{rupees.ToString("N2", CultureInfo.InvariantCulture)} {currency}";
         }
 
         public static string FormatPaisaRoundedRupees(long paisa)

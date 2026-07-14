@@ -4,6 +4,8 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using Core.Utils;
+using Core.Bootstrap;
 
 public class ManagerRoullete : MonoBehaviour
 {
@@ -69,7 +71,6 @@ public class ManagerRoullete : MonoBehaviour
     int[] black = new int[] { 2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35 };
     BetManager bManager;
     Bets betsScript;
-    APIs apisRef;
 
     public RouletteSpin s4;
 
@@ -112,7 +113,7 @@ public class ManagerRoullete : MonoBehaviour
         gamePhase = "Result";
         PlayerPrefs.SetInt("roulette_totalBets", 0);
         botWinArray = new int[3];
-        for(int i = 0; i< botWinA.Length; i++)
+        for (int i = 0; i < botWinA.Length; i++)
         {
             botWinArray[i] = botWinA[i];
         }
@@ -133,9 +134,9 @@ public class ManagerRoullete : MonoBehaviour
             if (PlayerPrefs.GetInt("roulette_totalBets") > 0)
             {
                 betsScript.totalBetAmt = PlayerPrefs.GetInt("roulette_totalBets");
-                betsScript.totalBetAmtTxt.text = betsScript.totalBetAmt.ToString();
+                betsScript.totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)betsScript.totalBetAmt);
             }
-          
+
         }
         else
         {
@@ -148,16 +149,14 @@ public class ManagerRoullete : MonoBehaviour
     private void UpdateWallet(float wAmount)
     {
         walletAmount = wAmount;
-        walletTxt.text = "₹" + walletAmount.ToString("F2");
+        walletTxt.text = MoneyFormatter.FormatPaisa((long)walletAmount);
     }
 
     void Start()
     {
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
         botManagerRef = FindObjectOfType<TableBotManager>();
         animBallPosRef = FindObjectOfType<AnimBallPos>();
-        walletTxt.text = "₹" + walletAmount.ToString("F2");
+        walletTxt.text = MoneyFormatter.FormatPaisa(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
         socketManagerRef = FindObjectOfType<SocketManagerRoulette>();
         goti.constraints = RigidbodyConstraints2D.FreezeAll;
         _Spinned = false;
@@ -180,7 +179,7 @@ public class ManagerRoullete : MonoBehaviour
         }
 
         autoRoulleteRef = FindObjectOfType<AutoRoullete>();
-        apisRef.FetchWallet();
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
     }
 
 
@@ -190,12 +189,11 @@ public class ManagerRoullete : MonoBehaviour
         if (!_isSpinning)
         {
             winAmnt = 0f;
-            
+
             roulletSpinAudio.Play();
             obstaclePanel.SetActive(true);
 
             StartCoroutine(SpinAnim(winNum));
-            walletTxt.text = "₹" + walletAmount.ToString("F2");
             _isSpinning = true;
         }
 
@@ -231,7 +229,7 @@ public class ManagerRoullete : MonoBehaviour
         //Coroutine timerCoroutine = StartCoroutine(autoRoulleteRef.Timer(18));
         ballAnimObj.SetActive(true);
         ballAnim.SetBool("_is", true);
-        
+
         whiteBall.SetActive(false);
         slideAnimator.SetBool("_slide", true);
         yield return new WaitForSeconds(4f);
@@ -239,7 +237,7 @@ public class ManagerRoullete : MonoBehaviour
         {
             yield return new WaitForSeconds(0.01f);
         }
-        while(animBallPosRef.latestCollisionObj.name != winNum.ToString());
+        while (animBallPosRef.latestCollisionObj.name != winNum.ToString());
         ballAnimObj.SetActive(false);
         whiteBall.SetActive(true);
         ballAnim.SetBool("_is", false);
@@ -266,7 +264,7 @@ public class ManagerRoullete : MonoBehaviour
         ShowResult(luckyNum);
         s4.gameObject.SetActive(false);
         WinAmountChk();
-    
+
         yield return new WaitForSeconds(2);
         historyRef.HistoryUpdate(luckyNum);
         yield return new WaitForSeconds(3);
@@ -278,12 +276,12 @@ public class ManagerRoullete : MonoBehaviour
         WinChk(luckyNum);
         botManagerRef.BotWin(botWinArray);
         yield return new WaitForSeconds(glow_anim_duration + 0.5f);
-        if (winAmnt> 0)
+        if (winAmnt > 0)
         {
-            walletAmount += winAmnt;
+            walletAmount += winAmnt * 100;
             totalWinOrLoseShowPanel.SetActive(true);
-            totalWinLoseText.text = "<size=48><color=yellow>Win</color></size>\n<color=green>" + "Rs. " + winAmnt + "</color>";
-            walletTxt.text = "₹" + walletAmount.ToString("F2");
+            totalWinLoseText.text = "<size=48><color=yellow>Win</color></size>\n<color=green>" + MoneyFormatter.FormatPaisa((long)(winAmnt * 100)) + "</color>";
+            walletTxt.text = MoneyFormatter.FormatPaisa((long)walletAmount);
 
         }
         _isBetPlaced = false;
@@ -340,7 +338,7 @@ public class ManagerRoullete : MonoBehaviour
             {
                 bDetail.betAmount *= 2;
                 betsScript.totalBetAmt *= 2;
-                betsScript.totalBetAmtTxt.text = betsScript.totalBetAmt.ToString();
+                betsScript.totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)betsScript.totalBetAmt);
             }
 
 
@@ -348,7 +346,7 @@ public class ManagerRoullete : MonoBehaviour
             {
                 bDetail.betAmount *= 2;
                 betsScript.totalBetAmt *= 2;
-                betsScript.totalBetAmtTxt.text = betsScript.totalBetAmt.ToString();
+                betsScript.totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)betsScript.totalBetAmt);
             }
 
 
@@ -356,27 +354,27 @@ public class ManagerRoullete : MonoBehaviour
             {
                 bDetail.betAmount *= 2;
                 betsScript.totalBetAmt *= 2;
-                betsScript.totalBetAmtTxt.text = betsScript.totalBetAmt.ToString();
+                betsScript.totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)betsScript.totalBetAmt);
             }
 
             foreach (BetDetails bDetail in betsScript.betsOnList4)
             {
                 bDetail.betAmount *= 2;
                 betsScript.totalBetAmt *= 2;
-                betsScript.totalBetAmtTxt.text = betsScript.totalBetAmt.ToString();
+                betsScript.totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)betsScript.totalBetAmt);
             }
 
             foreach (BetDetails bDetail in betsScript.betsOnList6)
             {
                 bDetail.betAmount *= 2;
                 betsScript.totalBetAmt *= 2;
-                betsScript.totalBetAmtTxt.text = betsScript.totalBetAmt.ToString();
+                betsScript.totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)betsScript.totalBetAmt);
             }
             foreach (BetDetails bDetail in betsScript.betsOnList12)
             {
                 bDetail.betAmount *= 2;
                 betsScript.totalBetAmt *= 2;
-                betsScript.totalBetAmtTxt.text = betsScript.totalBetAmt.ToString();
+                betsScript.totalBetAmtTxt.text = MoneyFormatter.FormatPaisa((long)betsScript.totalBetAmt);
             }
         }
         else
@@ -485,7 +483,7 @@ public class ManagerRoullete : MonoBehaviour
                 winAmnt += (bDetail.betAmount * numbersMultiplier);
             }
 
-            if(luckyNum != 0)
+            if (luckyNum != 0)
             {
                 /// odd or even
                 /// even hai
@@ -512,7 +510,7 @@ public class ManagerRoullete : MonoBehaviour
                     {
                         if (red[i] == luckyNum)
                         {
-                            winAmnt += (bDetail.betAmount * twoMultiplier);                          
+                            winAmnt += (bDetail.betAmount * twoMultiplier);
                         }
                     }
                 }
@@ -570,7 +568,7 @@ public class ManagerRoullete : MonoBehaviour
                 }
             }
 
-            if(luckyNum != 0)
+            if (luckyNum != 0)
             {
                 if (bDetail.betOn == 47)
                 {
@@ -596,7 +594,7 @@ public class ManagerRoullete : MonoBehaviour
                     }
                 }
             }
-           
+
         }
 
 
@@ -764,6 +762,6 @@ public class ManagerRoullete : MonoBehaviour
 
     public void Lobby()
     {
-        SceneManager.LoadScene(1);
+        SceneManager.LoadScene("Lobby");
     }
 }

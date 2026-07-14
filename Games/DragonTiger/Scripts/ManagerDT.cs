@@ -9,6 +9,8 @@ using DG.Tweening;
 using System;
 using System.Security.Cryptography;
 using System.Text;
+using Core.Bootstrap;
+using Core.Utils;
 
 public class ManagerDT : MonoBehaviour
 {
@@ -57,7 +59,7 @@ public class ManagerDT : MonoBehaviour
     public Animator cardAnimator2;
     public GameObject betRoda;
     public Text dragonBetAmountText, tigerBetAmountText, tieBetAmountText;
-    public GameObject target1 ,target2;
+    public GameObject target1, target2;
     public GameObject betStopsPanel, betStartPanel;
     public Text timer_text;
     public Image clockVsImg;
@@ -65,6 +67,7 @@ public class ManagerDT : MonoBehaviour
     public Sprite vsSpr;
     float walletAmount;
     public Text walletText;
+    private bool _resultAnimationComplete;
     public Sprite cardImg, cardImgRed;
     public int p1po, p2po;
     public Image dragonCard, tigerCard;
@@ -79,7 +82,6 @@ public class ManagerDT : MonoBehaviour
     public List<GameObject> myCoinsList;
     public Transform myCoinHolder;
     Vector3 recentTouchPos;
-    APIs apisRef;
     public enum GameState
     {
         Betting,
@@ -89,7 +91,7 @@ public class ManagerDT : MonoBehaviour
 
     void Awake()
     {
-        if(Instance != this)
+        if (Instance != this)
         {
             Instance = this;
         }
@@ -119,9 +121,7 @@ public class ManagerDT : MonoBehaviour
     {
         Debug.Log("apath: " + Application.persistentDataPath);
         LoadDeck();
-        apisRef = FindObjectOfType<APIs>();
-        apisRef.OnWalletFetched += UpdateWallet;
-        apisRef.FetchWallet();
+        UpdateWallet(BootstrapService.Instance.Wallet != null ? BootstrapService.Instance.Wallet.available_balance : 0);
 
         Screen.orientation = ScreenOrientation.LandscapeLeft;
         SocketManagerDTRef = FindObjectOfType<SocketManagerDT>();
@@ -138,7 +138,7 @@ public class ManagerDT : MonoBehaviour
 
     public void InitializeBots(List<BotData> data, long roundStartTime)
     {
-        if(botManagerRef != null)
+        if (botManagerRef != null)
         {
             botManagerRef.InitializeBots(data, roundStartTime);
 
@@ -160,18 +160,25 @@ public class ManagerDT : MonoBehaviour
 
     }
 
-    private void UpdateWallet(float wAmount)
+    public void UpdateWallet(long wAmount)
     {
         walletAmount = wAmount;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
     }
+
+    public void BeginResultProcessing()
+    {
+        _resultAnimationComplete = false;
+    }
+
+    public bool IsResultAnimationComplete => _resultAnimationComplete;
     public void CheckForPendingBets()
     {
 
-        if(PlayerPrefs.GetString("DvT_roundId") == SocketManagerDTRef.currentRoundId)
+        if (PlayerPrefs.GetString("DvT_roundId") == SocketManagerDTRef.currentRoundId)
         {
-           
-            if(PlayerPrefs.GetInt("dt_betsOnDragon") > 0)
+
+            if (PlayerPrefs.GetInt("dt_betsOnDragon") > 0)
             {
                 betAmountDragon = PlayerPrefs.GetInt("dt_betsOnDragon");
             }
@@ -183,7 +190,7 @@ public class ManagerDT : MonoBehaviour
             {
                 betAmountTie = PlayerPrefs.GetInt("dt_betsOnTie");
             }
-           
+
         }
         else
         {
@@ -210,7 +217,7 @@ public class ManagerDT : MonoBehaviour
     {
         waitingForNextRound_Obj.SetActive(true);
     }
-   
+
     public IEnumerator GameStartEnum(int remTime, long startTime, string[] seeds)
     {
         Debug.Log("Hurray");
@@ -222,11 +229,11 @@ public class ManagerDT : MonoBehaviour
         betAmountTie = 0;
         if (remTime > 10)
         {
-      
+
             betStartPanel.SetActive(true);
         }
         SwordSlashSoundEffectAudioSource.Play();
-        
+
         yield return new WaitForSeconds(2f);
         betStartPanel.SetActive(false);
         _StopAmount = false;
@@ -234,12 +241,12 @@ public class ManagerDT : MonoBehaviour
         BetAmountIncrease(startTime, seeds);
         betRoda.SetActive(false);
         // StartCoroutine(burstScript.AnimStart(remTime, 15));
-        
+
 
         foreach (Transform child in target1.transform)
         {
             // Destroy the child GameObject
-            if(child.gameObject.tag != "Value")
+            if (child.gameObject.tag != "Value")
             {
                 Destroy(child.gameObject);
             }
@@ -265,7 +272,7 @@ public class ManagerDT : MonoBehaviour
 
         int t;
         List<int> excludedValues = new List<int>();
-        for(int i = 0; i<3; i++)
+        for (int i = 0; i < 3; i++)
         {
             do
             {
@@ -282,7 +289,7 @@ public class ManagerDT : MonoBehaviour
             } while (excludedValues.Contains(t));
             excludedValues.Add(t);
         }
-        if(clockVsImg.sprite != clockSpr)
+        if (clockVsImg.sprite != clockSpr)
         {
             clockVsImg.transform.DOScaleX(0, 0.3f)
          .SetEase(Ease.Linear)
@@ -296,15 +303,15 @@ public class ManagerDT : MonoBehaviour
          .OnComplete(() =>
          {
 
-           });
+         });
          });
         }
-      
+
     }
     Coroutine timerEnumRef;
     public void StartTimerFun(float val)
     {
-        if(timerEnumRef != null)
+        if (timerEnumRef != null)
         {
             StopCoroutine(timerEnumRef);
         }
@@ -332,14 +339,14 @@ public class ManagerDT : MonoBehaviour
         int stepsToSkip = Mathf.FloorToInt(elapsedTimeInSeconds * 2); // 5 steps per second
         for (int i = 0; i < stepsToSkip; i++)
         {
-            if(rvi < 37)
+            if (rvi < 37)
             {
                 rvi++;
                 randomValue1 += random1.Next(1, 10);
                 randomValue2 += random2.Next(1, 10);
                 randomValue3 += random3.Next(1, 10);
             }
-            
+
         }
 
         // Start generating random values
@@ -357,29 +364,29 @@ public class ManagerDT : MonoBehaviour
     }
 
     private IEnumerator IncreaseRandomValues()
-    {        
+    {
         while (isGenerating)
         {
 
             int increment1 = random1.Next(1, 10);
             int increment2 = random2.Next(1, 10);
             int increment3 = random3.Next(1, 10);
-            if(rvi < 37)
+            if (rvi < 37)
             {
                 rvi++;
                 randomValue1 += increment1;
                 randomValue2 += increment2;
                 randomValue3 += increment3;
             }
-          
+
 
             int k = (randomValue1 * 990);
             int l = (randomValue2 * 990);
             int m = (randomValue3 * 90);
 
-            dragonBetAmountText.text = $"<color=yellow>{betAmountDragon}</color><color=#02ccfe>/{k}</color>";
-            tigerBetAmountText.text = $"<color=yellow>{betAmountTiger}</color><color=#02ccfe>/{l}</color>";
-            tieBetAmountText.text = $"<color=yellow>{betAmountTie}</color><color=#02ccfe>/{m}</color>";
+            dragonBetAmountText.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmountDragon)}</color><color=#02ccfe>/{k}</color>";
+            tigerBetAmountText.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmountTiger)}</color><color=#02ccfe>/{l}</color>";
+            tieBetAmountText.text = $"<color=yellow>{MoneyFormatter.FormatPaisa(betAmountTie)}</color><color=#02ccfe>/{m}</color>";
 
             yield return new WaitForSeconds(updateInterval);
         }
@@ -403,7 +410,7 @@ public class ManagerDT : MonoBehaviour
             }
         }
         // Wait for the specified duration
-       
+
     }
 
     public void DisplayCards(string dragonCard, string tigerCard, char winner, int[] botWinArray)
@@ -423,7 +430,7 @@ public class ManagerDT : MonoBehaviour
 
     IEnumerator ThrowItemAnimEnum(int player, int item)
     {
-        throwItemAnimators_array[player].SetInteger("val", item );
+        throwItemAnimators_array[player].SetInteger("val", item);
         yield return new WaitForSeconds(0.5f);
         throwItemAnimators_array[player].SetInteger("val", 0);
     }
@@ -431,23 +438,22 @@ public class ManagerDT : MonoBehaviour
     public void ClearAllBets()
     {
         Debug.Log("radhey");
-        if(betAmountDragon <= 0 && betAmountTie <= 0 && betAmountTiger <= 0) return;
+        if (betAmountDragon <= 0 && betAmountTie <= 0 && betAmountTiger <= 0) return;
         walletAmount += betAmountDragon + betAmountTie + betAmountTiger;
-        walletText.text = "₹" + walletAmount.ToString("F2");
+        walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
 
-        betAmountTie = 0; 
-        betAmountDragon = 0; 
+        betAmountTie = 0;
+        betAmountDragon = 0;
         betAmountTiger = 0;
         PlayerPrefs.SetInt("dt_betsOnDragon", betAmountDragon);
         PlayerPrefs.SetInt("dt_betsOnTie", betAmountTie);
         PlayerPrefs.SetInt("dt_betsOnTiger", betAmountTiger);
-        SocketManagerDTRef.ClearAllBets();
         ClearMyCoins();
     }
 
     void ClearMyCoins()
     {
-        foreach(GameObject g in myCoinsList)
+        foreach (GameObject g in myCoinsList)
         {
             Destroy(g);
         }
@@ -455,7 +461,7 @@ public class ManagerDT : MonoBehaviour
     }
 
     void InstantiateCoin()
-    {        
+    {
         GameObject coin = Instantiate(TableBotManager.Instance.coinPrefabList[betManagerRef.betChipNum - 1], myCoinHolder);
         coin.transform.localScale = Vector3.one;
         coin.transform.position = recentTouchPos;
@@ -467,36 +473,38 @@ public class ManagerDT : MonoBehaviour
     {
 
         if (currentGameState != GameState.Betting) return;
-        int val = betManagerRef.betVal;
-        if(val <= walletAmount)
+        int betValPaisa = betManagerRef.betVal * 100;
+        if (betValPaisa <= walletAmount)
         {
-            walletAmount -= val;
+            walletAmount -= betValPaisa;
             SingleCoinSound.Play();
             PlayerPrefs.SetString("DvT_roundId", SocketManagerDTRef.currentRoundId);
-            walletText.text = "₹" + walletAmount.ToString("F2");
+            walletText.text = MoneyFormatter.FormatPaisa((long)walletAmount);
             InstantiateCoin();
 
-            switch (betOn){
+            switch (betOn)
+            {
                 case 0:
                     //tie case
-                    betAmountTie += val;
-                    SocketManagerDTRef.SendBetDataToServer(betOn, val);
+                    betAmountTie += betValPaisa;
+                    SocketManagerDTRef.SendBetDataToServer(betOn, betValPaisa);
                     PlayerPrefs.SetInt("dt_betsOnTie", betAmountTie);
                     break;
                 case 1:
-                    betAmountDragon += val;
-                    SocketManagerDTRef.SendBetDataToServer(betOn, val);
+                    betAmountDragon += betValPaisa;
+                    SocketManagerDTRef.SendBetDataToServer(betOn, betValPaisa);
                     PlayerPrefs.SetInt("dt_betsOnDragon", betAmountDragon);
 
                     break;
                 case 2:
-                    betAmountTiger += val;
-                    SocketManagerDTRef.SendBetDataToServer(betOn, val);
+                    betAmountTiger += betValPaisa;
+                    SocketManagerDTRef.SendBetDataToServer(betOn, betValPaisa);
                     PlayerPrefs.SetInt("dt_betsOnTiger", betAmountTiger);
                     break;
             }
         }
-        else { 
+        else
+        {
             insufficientFundsObj.SetActive(true);
         }
 
@@ -520,7 +528,10 @@ public class ManagerDT : MonoBehaviour
     public IEnumerator ShowCardsEnum(string dragon_card, string tiger_card, char winner, int[] winArray)
     {
 
-        int k = UnityEngine.Random.Range(0, 1000);
+        betStopsPanel.SetActive(true);
+        yield return new WaitForSeconds(1.5f);
+        betStopsPanel.SetActive(false);
+
 
         yield return new WaitForSeconds(1f);
         fire1Object.SetActive(false);
@@ -532,11 +543,11 @@ public class ManagerDT : MonoBehaviour
 
         dragonCard.sprite = GetSpriteByName(dragon_card);
         tigerCard.sprite = GetSpriteByName(tiger_card);
-        
+
         yield return new WaitForSeconds(0.5f);
         cardAnimator1.SetBool("_flip", false);
         cardAnimator2.SetBool("_flip", false);
-   
+
         StartCoroutine(WinnerDisplay(winner, winArray));
         Debug.Log("WinnerDisplassssssy");
 
@@ -580,7 +591,7 @@ public class ManagerDT : MonoBehaviour
                 break;
 
         }
-  
+
         yield return new WaitForSeconds(1);
 
 
@@ -605,7 +616,7 @@ public class ManagerDT : MonoBehaviour
                 break;
 
         }
-       ClearMyCoins();
+        ClearMyCoins();
         yield return new WaitForSeconds(2f);
 
         botManagerRef.BotWin(winArray);
@@ -615,9 +626,10 @@ public class ManagerDT : MonoBehaviour
         {
             Debug.Log("win amnt : " + winAmnt);
             winPanel.SetActive(true);
-            winPanelAmntTxt.text = "+" + winAmnt.ToString("F1");
+            winPanelAmntTxt.text = "+" + MoneyFormatter.FormatPaisa((long)winAmnt);
             yield return new WaitForSeconds(0.5f);
-            apisRef.FetchWallet();
+            
+            Debug.Log("removed fetch wallet from here in dt win game");
             yield return new WaitForSeconds(1f);
             winPanel.SetActive(false);
         }
@@ -635,6 +647,8 @@ public class ManagerDT : MonoBehaviour
         cardAnimator1.SetBool("_flip", false);
         cardAnimator2.SetBool("_flip", false);
         yield return new WaitForSeconds(0.5f);
+
+        _resultAnimationComplete = true;
     }
 
 
@@ -644,5 +658,5 @@ public class ManagerDT : MonoBehaviour
         effect_AudioSource.clip = clip;
         effect_AudioSource.Play();
     }
-  
+
 }

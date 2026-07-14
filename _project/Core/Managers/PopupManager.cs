@@ -20,8 +20,7 @@ namespace Core.Managers
         Action primaryAction;
         Action secondaryAction;
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        static void Bootstrap()
+        public static void EnsureInitialized()
         {
             if (Instance != null) return;
             var go = new GameObject("[PopupManager]");
@@ -59,6 +58,7 @@ namespace Core.Managers
             if (popupRoot == null)
             {
                 Debug.Log($"[Popup] {title}: {message}");
+                Toast.Instance.ShowLog(message);
                 onClose?.Invoke();
                 return;
             }

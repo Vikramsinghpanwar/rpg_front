@@ -6,6 +6,8 @@ using Features.Lobby.Integration;
 using UnityEngine;
 using UnityEngine.Playables;
 using UnityEngine.SceneManagement;
+using Core.Utils;
+using Core.Bootstrap;
 
 namespace Teenpatti
 {
@@ -70,6 +72,8 @@ namespace Teenpatti
                 ["turn_update"] = HandleTurnUpdate<TurnUpdateResponse>,
                 ["player_recharging"] = HandleRechargeUpdate<PlayerRechargingResponse>,
                 ["player_recharged"] = HandlePlayerRecharged<PlayerRechargedResponse>,
+                ["recharge_success"] = HandleRechargeSuccess<RechargeSuccessResponse>,
+                ["player_recharged"] = HandlePlayerRecharged<RechargeSuccessResponse>,
                 ["table_state"] = HandleTableState<TableStateResponse>,
                 ["bet_update"] = HandleBetUpdate,
                 ["show_down"] = HandleShowdownResult<ShowDownResult>,
@@ -79,8 +83,8 @@ namespace Teenpatti
                 ["action_accepted"] = HandleActionAccepted<ActionAcceptedData>,
                 ["left"] = HandleLeft<LeftResponse>,
                 ["pot_limit_reached"] = HandlePotLimitReached<PotLimitReachedResponse>,
-                ["player_left"] = HandlePlayerDisconnected<PlayerDisconnectedResponse>,
-                ["player_intentional_leave"] = HandleLeft<LeftResponse>,
+                ["player_disconnected"] = HandlePlayerDisconnected<PlayerDisconnectedResponse>,
+                ["player_left"] = HandleLeft<LeftResponse>,
                 ["error"] = HandleError<ErrorResponse>,
                 ["pong"] = HandlePong
             };
@@ -135,6 +139,14 @@ namespace Teenpatti
                 if (baseMsg.type == "error")
                 {
                     Logger.Instance.Log(baseMsg.data.message);
+                    if (baseMsg.data.message.Contains("Insufficient balance"))
+                    {
+                        MainThreadDispatcher.Enqueue(() =>
+                        {
+                            if (ActionButtons.instance != null)
+                                ActionButtons.instance.InsufficientFunds();
+                        });
+                    }
                 }
                 handler(json);
             }
@@ -151,7 +163,6 @@ namespace Teenpatti
 
         private void HandlePrivateRoomCreated<T>(string json)
         {
-
             WSMessage<T> msg;
 
             try
@@ -160,7 +171,7 @@ namespace Teenpatti
             }
             catch (Exception e)
             {
-                Debug.LogError("Typed parse failed: " + e.Message);
+                Debug.LogError($"Typed parse failed: {e.Message}");
                 return;
             }
 
@@ -174,57 +185,38 @@ namespace Teenpatti
 
             try
             {
-                Debug.Log($"Joined data : {data}");
-                // var joinData = JsonUtility.FromJson<JoinedResponse>(data);
-                // if (joinData != null)
-                // {
-                //     MainThreadDispatcher.Enqueue(() =>
-                //     {
-                //         GameLiveData.instance.isGameActive = joinData.status == "playing";
-                //         GameLiveData.instance.privateTableCode = joinData.privateCode;
-                //         GameLiveData.instance.tableState = joinData.status;
-                //          PlayerDetails[] playerDetails = new PlayerDetails[joinData.players.Length];
-                //         for (int i = 0; i < joinData.players.Length; i++)
-                //         {
-                //             var playerState = joinData.players[i];
-                //             playerDetails[i] = new PlayerDetails
-                //             {
-                //                 id = playerState.userID,
-                //                 userId = playerState.userID,
-                //                 username = playerState.username,
-                //                 position = playerState.position,
-                //                 profileImageIndex = playerState.profileImage.index
-                //             };
-                //         }
+                JoinedResponse roomData = JsonUtility.FromJson<JoinedResponse>(data);
+                if (roomData == null)
+                {
+                    Debug.LogError("Failed to parse roomCreated response as JoinedResponse");
+                    return;
+                }
 
-                //         // Update GameLiveData
-                //         GameLiveData.instance.playerDetailsArray = playerDetails;
-                //         GameLiveData.instance.tableId = joinData.tableID;
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    ConnectionManager.Instance.GetCurrentPrivateCode();
+                    GameLiveData.instance.isGameActive = true;
+                    GameLiveData.instance.privateTableCode = roomData.privateCode;
+                    GameLiveData.instance.tableId = roomData.tableID;
+                    GameLiveData.instance.tableState = roomData.status;
 
+                    if (TeenpattiLobby.instance != null)
+                    {
+                        if (!string.IsNullOrEmpty(roomData.privateCode))
+                        {
+                            TeenpattiLobby.instance.OnRoomCreated(roomData.privateCode);
+                        }
+                    }
 
-                //         // Update UI
-                //         if (TeenpattiLobby.instance != null)
-                //         {
-                //             if (joinData.status == "waiting")
-                //             {
-                //                 TeenpattiLobby.instance.ShowRoomPanel(joinData.tableID, 1);
-
-                //             }
-                //             else if (joinData.status == "playing")
-                //             {
-                //                 // We joined a game in progress, need to request game state
-                //                 RequestGameState();
-                //             }
-                //         }
-                //         // Load game scene
-                //         SceneManager.LoadSceneAsync("Teenpatti");
-
-                //     });
-                // }
+                    if (roomData.status == "waiting")
+                    {
+                        SceneManager.LoadSceneAsync("Teenpatti");
+                    }
+                });
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Error handling joined: {ex.Message}");
+                Debug.LogError($"Error handling roomCreated: {ex.Message}");
             }
         }
 
@@ -239,7 +231,7 @@ namespace Teenpatti
             }
             catch (Exception e)
             {
-                Debug.LogError("Typed parse failed: " + e.Message);
+                Debug.LogError($"Typed parse failed: {e.Message}");
                 return;
             }
 
@@ -253,72 +245,35 @@ namespace Teenpatti
 
             try
             {
-                Debug.Log($"Joined data : {data}");
                 var joinData = JsonUtility.FromJson<JoinedResponse>(data);
                 if (joinData != null)
                 {
-                    // MainThreadDispatcher.Enqueue(() =>
-                    // {
-                    //     GameLiveData.instance.isGameActive = joinData.status == "playing";
-                    //     GameLiveData.instance.privateTableCode = joinData.privateCode;
-                    //     GameLiveData.instance.tableState = joinData.status;
-                    //      PlayerDetails[] playerDetails = new PlayerDetails[joinData.players.Length];
-                    //     for (int i = 0; i < joinData.players.Length; i++)
-                    //     {
-                    //         var playerState = joinData.players[i];
-                    //         playerDetails[i] = new PlayerDetails
-                    //         {
-                    //             id = playerState.userID,
-                    //             userId = playerState.userID,
-                    //             username = playerState.username,
-                    //             position = playerState.position,
-                    //             profileImageIndex = playerState.profileImage.index
-                    //         };
-                    //     }
-
-                    //     // Update GameLiveData
-                    //     GameLiveData.instance.playerDetailsArray = playerDetails;
-                    //     GameLiveData.instance.tableId = joinData.tableID;
-
-
-                    //     // Update UI
-                    //     if (TeenpattiLobby.instance != null)
-                    //     {
-                    //         if (joinData.status == "waiting")
-                    //         {
-                    //             TeenpattiLobby.instance.ShowRoomPanel(joinData.tableID, 1);
-
-                    //         }
-                    //         else if (joinData.status == "playing")
-                    //         {
-                    //             // We joined a game in progress, need to request game state
-                    //             RequestGameState();
-                    //         }
-                    //     }
-                    //     // Load game scene
-                    //     SceneManager.LoadSceneAsync("Teenpatti");
-
-                    // });
-
-
                     MainThreadDispatcher.Enqueue(() =>
-        {
-            GameLiveData.instance.isGameActive = true;
-            GameLiveData.instance.tableId = joinData.tableID;
+                    {
+                        GameLiveData.instance.isGameActive = true;
+                        GameLiveData.instance.tableId = joinData.tableID;
 
-            // For waiting tables, show room panel
-            if (joinData.status == "waiting")
-            {
-                TeenpattiLobby.instance?.ShowRoomPanel(joinData.tableID, 1);
-            }
-            SceneManager.LoadSceneAsync("Teenpatti");
+                        if (!string.IsNullOrEmpty(joinData.privateCode))
+                        {
+                            GameLiveData.instance.privateTableCode = joinData.privateCode;
+                        }
 
-            // For playing tables, table_state will follow with full state
-            // No need to load scene here - wait for table_state
-        });
-
-
-
+                        if (joinData.status == "waiting" || joinData.status == "starting")
+                        {
+                            if (TeenpattiLobby.instance != null)
+                            {
+                                TeenpattiLobby.instance.ShowRoomPanel(joinData.tableID, 1);
+                            }
+                            SceneManager.LoadSceneAsync("Teenpatti");
+                        }
+                        else if (joinData.status == "playing")
+                        {
+                            if (SceneManager.GetActiveScene().name != "Teenpatti")
+                            {
+                                SceneManager.LoadSceneAsync("Teenpatti");
+                            }
+                        }
+                    });
                 }
             }
             catch (Exception ex)
@@ -463,14 +418,16 @@ namespace Teenpatti
                 {
                     MainThreadDispatcher.Enqueue(() =>
                     {
-                        // Show spectator join notification
                         if (GameManager.Instance != null)
                         {
                             PlayerManager player = GameManager.Instance.playersList[PlayerJoined.position];
-                            player.PopulateWithPlayer(PlayerJoined.profile_image.index, PlayerJoined.username);
-                            GameManager.Instance.playersList[PlayerJoined.position].myId = PlayerJoined.userID;
-                            GameManager.Instance.playersList[PlayerJoined.position].profileImg.sprite = GameManager.Instance.GetAvatarByIndex(PlayerJoined.profile_image.index);
-                            GameManager.Instance.playersList[PlayerJoined.position].nameTxt.text = PlayerJoined.username;
+                            player.PopulateWithPlayer(
+                                0,
+                                PlayerJoined.username,
+                                PlayerJoined.profileImageUrl
+                            );
+                            player.myId = PlayerJoined.userID;
+                            player.nameTxt.text = PlayerJoined.username;
                         }
                     });
                 }
@@ -636,24 +593,24 @@ namespace Teenpatti
                         for (int i = 0; i < gameStartData.players.Length; i++)
                         {
                             var playerState = gameStartData.players[i];
-                            if (playerState == null || !playerState.IsActive) continue;
+                            if (playerState == null || !playerState.isActive) continue;
                             playerDetails[i] = new PlayerDetails
                             {
-                                id = playerState.UserID,
-                                userId = playerState.UserID,
-                                username = playerState.Username,
-                                chips = playerState.Chips,
-                                amount = playerState.Chips,
-                                position = playerState.Position,
-                                isActive = playerState.IsActive,
-                                hasFolded = playerState.HasFolded,
-                                hasSeenCards = playerState.IsSeen,
-                                betAmount = playerState.BetAmount,
-                                totalBetAmount = playerState.TotalBet,
-                                action = playerState.LastAction,
-                                isMyTurn = playerState.UserID == gameStartData.currentTurn,
-                                isBot = playerState.IsBot,
-                                profileImageIndex = playerState.ProfileImage.index,
+                                id = playerState.publicId,
+                                publicId = playerState.publicId,
+                                username = playerState.username,
+                                chips = playerState.chips,
+                                amount = playerState.chips,
+                                position = playerState.position,
+                                isActive = playerState.isActive,
+                                hasFolded = playerState.hasFolded,
+                                hasSeenCards = playerState.isSeen,
+                                betAmount = playerState.betAmount,
+                                totalBetAmount = playerState.totalBet,
+                                action = playerState.lastAction,
+                                isMyTurn = playerState.publicId == gameStartData.currentTurnPublicId,
+                                isBot = playerState.isBot,
+                                profileImageUrl = playerState.profileImageUrl,
                             };
 
                         }
@@ -781,7 +738,7 @@ namespace Teenpatti
                             {
                                 var player = GameLiveData.instance.playerDetailsArray[i];
                                 if (player == null) continue;
-                                if (player.userId == playerUpdate.userID)
+                                if (player.publicId == playerUpdate.publicId)
                                 {
                                     // Update player details
                                     player.username = playerUpdate.username;
@@ -847,7 +804,7 @@ namespace Teenpatti
                             {
                                 var player = GameLiveData.instance.playerDetailsArray[i];
                                 if (player == null) continue;
-                                if (player.userId == playerUpdate.userID)
+                                if (player.publicId == playerUpdate.publicId)
                                 {
                                     // Update player details
                                     player.username = playerUpdate.username;
@@ -861,12 +818,23 @@ namespace Teenpatti
                                     player.action = playerUpdate.lastAction;
                                     player.isBot = playerUpdate.isBot;
 
+                                    // try
+                                    // {
+                                    //     string localId = BootstrapLobbyAdapter.GetUserId();
+                                    //     if (!string.IsNullOrEmpty(localId) && playerUpdate.publicId == localId && BootstrapService.Instance != null && BootstrapService.Instance.Wallet != null)
+                                    //     {
+                                    //         BootstrapService.Instance.Wallet.available_balance = playerUpdate.chips * 100;
+                                    //         BootstrapService.Instance.Wallet.withdrawable_amount = playerUpdate.chips * 100;
+                                    //     }
+                                    // }
+                                    // catch { }
+
                                     // Update UI
                                     if (GameManager.Instance != null && i < GameManager.Instance.playersList.Count)
                                     {
                                         foreach (var p in GameManager.Instance.playersList)
                                         {
-                                            if (p.myId == playerUpdate.userID)
+                                            if (p.myId == playerUpdate.publicId)
                                             {
                                                 var playerManager = p;
                                                 // playerManager.myAmountTxt.text = playerUpdate.chips.ToString();  
@@ -939,8 +907,8 @@ namespace Teenpatti
                         Debug.Log("adding: " + p.username + " at " + p.position);
                         playerDetails[i] = new PlayerDetails
                         {
-                            id = p.userID,
-                            userId = p.userID,
+                            id = p.publicId,
+                            publicId = p.publicId,
                             username = p.username,
                             chips = p.chips,
                             position = p.position,
@@ -958,7 +926,7 @@ namespace Teenpatti
                             // ❗spectator NEVER has turn
                             isMyTurn = false,
 
-                            //profileImageIndex = p.profileImage.index
+                            profileImageUrl = p.profileImageUrl
                         };
                     }
 
@@ -1031,7 +999,7 @@ namespace Teenpatti
             try
             {
                 var tableState = JsonUtility.FromJson<TableStateResponse>(data);
-                if (tableState != null)
+                if (tableState != null && tableState.state == "playing")
                 {
                     MainThreadDispatcher.Enqueue(() =>
                     {
@@ -1045,8 +1013,8 @@ namespace Teenpatti
                             var playerState = tableState.players[i];
                             playerDetails[i] = new PlayerDetails
                             {
-                                id = playerState.userID,
-                                userId = playerState.userID,
+                                id = playerState.publicId,
+                                publicId = playerState.publicId,
                                 username = playerState.username,
                                 chips = playerState.chips,
                                 amount = playerState.chips,
@@ -1061,7 +1029,7 @@ namespace Teenpatti
                                 action = playerState.lastAction,
                                 isMyTurn = playerState.position == tableState.currentTurn,
                                 isBot = playerState.isBot,
-                                profileImageIndex = playerState.profileImage.index,
+                                profileImageUrl = playerState.profileImageUrl,
                                 canShow = playerState.canShow,
                                 canSideShow = playerState.canSideShow,
                             };
@@ -1079,6 +1047,7 @@ namespace Teenpatti
                         GameLiveData.instance.timeRemainingForTurn = tableState.turnTimeRemaining;
                         GameLiveData.instance.rechargingPlayer = tableState.rechargingPlayer;
                         GameLiveData.instance.rechargeTimeRemaining = tableState.rechargeTimeRemaining;
+                        GameLiveData.instance.tableState = tableState.state;
 
 
                         // Find current turn index
@@ -1098,15 +1067,29 @@ namespace Teenpatti
                             if (tableState.rechargingPlayer != null && tableState.rechargingPlayer != "" && tableState.rechargeTimeRemaining > 0)
                             {
                                 Debug.Log($"Player {tableState.rechargingPlayer} is recharging with {tableState.rechargeTimeRemaining} seconds left");
-                                GameManager.Instance.Recharging(tableState.rechargingPlayer, tableState.rechargeTimeRemaining);
+                                GameManager.Instance.Recharging(tableState.rechargingPlayer, "", tableState.rechargeTimeRemaining);
                             }
-
                         }
 
 
                         Debug.Log($"Game started on table: {tableState.tableID}, pot: {tableState.pot}");
                         // GameManager.Instance.SyncGameState(playerDetails);
                         GameLiveData.instance.rejoin = true;
+                    });
+                }
+                else if (tableState != null && tableState.state == "waiting" || tableState.state == "starting")
+                {
+                    MainThreadDispatcher.Enqueue(() =>
+                    {
+                        GameLiveData.instance.ResetGameData();
+                        GameLiveData.instance.isGameActive = false;
+                        GameLiveData.instance.rejoin = false;
+                        GameLiveData.instance.tableState = tableState.state;
+                        if (GameManager.Instance)
+                        {
+                            GameManager.Instance.waitingPanel.SetActive(true);
+                            //GameManager.Instance.SyncGameState();
+                        }
                     });
                 }
             }
@@ -1147,7 +1130,7 @@ namespace Teenpatti
                     {
                         if (GameManager.Instance != null)
                         {
-                            GameManager.Instance.Recharging(rechargeUpdate.userID, rechargeUpdate.timeout);
+                            GameManager.Instance.Recharging(rechargeUpdate.publicId, rechargeUpdate.username, rechargeUpdate.timeout);
                         }
                     });
                 }
@@ -1182,21 +1165,180 @@ namespace Teenpatti
 
             try
             {
-                var rechargeUpdate = JsonUtility.FromJson<PlayerRechargedResponse>(data);
-                if (rechargeUpdate != null)
+                var rechargeSuccess = JsonUtility.FromJson<RechargeSuccessResponse>(data);
+                if (rechargeSuccess != null)
                 {
                     MainThreadDispatcher.Enqueue(() =>
                     {
-                        if (GameManager.Instance != null)
+                        if (GameManager.Instance == null) return;
+
+                        string localUserId = BootstrapLobbyAdapter.GetUserId();
+                        bool isLocal = false;
+
+                        if (!string.IsNullOrEmpty(localUserId))
                         {
-                            GameManager.Instance.Recharged();
+                            isLocal = rechargeSuccess.publicId == localUserId || rechargeSuccess.userID == localUserId;
                         }
+                        if (isLocal) return;
+
+                        string targetId = string.IsNullOrEmpty(rechargeSuccess.publicId) ? rechargeSuccess.userID : rechargeSuccess.publicId;
+
+                        if (!string.IsNullOrEmpty(targetId) && GameLiveData.instance.playerDetailsArray != null)
+                        {
+                            foreach (var player in GameLiveData.instance.playerDetailsArray)
+                            {
+                                if (player == null) continue;
+                                if (player.publicId == targetId)
+                                {
+                                    player.chips = rechargeSuccess.chips;
+                                    player.amount = rechargeSuccess.chips;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (isLocal)
+                        {
+                            GameData.Instance.playerChips = rechargeSuccess.chips;
+                            PlayerPrefs.SetInt("TP_Chips", rechargeSuccess.chips);
+                            PlayerPrefs.Save();
+
+                            try
+                            {
+                                if (BootstrapService.Instance != null && BootstrapService.Instance.Wallet != null)
+                                {
+                                    BootstrapService.Instance.Wallet.available_balance += rechargeSuccess.amount * 100;
+                                    BootstrapService.Instance.Wallet.withdrawable_amount += rechargeSuccess.amount * 100;
+                                }
+                            }
+                            catch { }
+
+                            GameManager.Instance.UpdateWalletTxt();
+
+                            // if (GameManager.Instance.localPlayer != null)
+                            // {
+                            //     GameManager.Instance.localPlayer.myAmountTxt.text = MoneyFormatter.FormatPaisa((long)(rechargeSuccess.chips * 100));
+                            // }
+
+                            if (ActionButtons.instance != null)
+                            {
+                                ActionButtons.instance.addRechargePanel.SetActive(false);
+                            }
+
+                            if (InGameRecharge.instance != null)
+                            {
+                                InGameRecharge.instance.ClosePanel();
+                            }
+
+                        }
+                        GameManager.Instance.Recharged();
+
                     });
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Error handling turn_update: {ex.Message}");
+                Debug.LogError($"Error handling recharge_success: {ex.Message}");
+            }
+        }
+
+
+        private void HandleRechargeSuccess<T>(string json)
+        {
+            WSMessage<T> msg;
+
+            try
+            {
+                msg = JsonUtility.FromJson<WSMessage<T>>(json);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("Typed parse failed: " + e.Message);
+                return;
+            }
+
+            if (msg == null || msg.data == null)
+            {
+                Debug.LogError("Message data is null");
+                return;
+            }
+
+            string data = JsonUtility.ToJson(msg.data);
+
+            try
+            {
+                var rechargeSuccess = JsonUtility.FromJson<RechargeSuccessResponse>(data);
+                if (rechargeSuccess != null)
+                {
+                    MainThreadDispatcher.Enqueue(() =>
+                    {
+                        if (GameManager.Instance == null) return;
+
+                        string localUserId = BootstrapLobbyAdapter.GetUserId();
+                        bool isLocal = false;
+
+                        if (!string.IsNullOrEmpty(localUserId))
+                        {
+                            isLocal = rechargeSuccess.publicId == localUserId || rechargeSuccess.userID == localUserId;
+                        }
+
+                        string targetId = string.IsNullOrEmpty(rechargeSuccess.publicId) ? rechargeSuccess.userID : rechargeSuccess.publicId;
+
+                        if (!string.IsNullOrEmpty(targetId) && GameLiveData.instance.playerDetailsArray != null)
+                        {
+                            foreach (var player in GameLiveData.instance.playerDetailsArray)
+                            {
+                                if (player == null) continue;
+                                if (player.publicId == targetId)
+                                {
+                                    player.chips = rechargeSuccess.chips;
+                                    player.amount = rechargeSuccess.chips;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (isLocal)
+                        {
+                            GameData.Instance.playerChips = rechargeSuccess.chips;
+                            PlayerPrefs.SetInt("TP_Chips", rechargeSuccess.chips);
+                            PlayerPrefs.Save();
+
+                            try
+                            {
+                                if (BootstrapService.Instance != null && BootstrapService.Instance.Wallet != null)
+                                {
+                                    BootstrapService.Instance.Wallet.available_balance = rechargeSuccess.chips * 100 + (GameMode.mode == GameMode.Modes.privateGame ? BootstrapService.Instance.Wallet.bonus_balance : 0);
+                                }
+                            }
+                            catch { }
+
+                            GameManager.Instance.UpdateWalletTxt();
+
+                            // if (GameManager.Instance.localPlayer != null)
+                            // {
+                            //     GameManager.Instance.localPlayer.myAmountTxt.text = MoneyFormatter.FormatPaisa((long)(rechargeSuccess.chips * 100));
+                            // }
+
+                            if (ActionButtons.instance != null)
+                            {
+                                ActionButtons.instance.addRechargePanel.SetActive(false);
+                            }
+
+                            if (InGameRecharge.instance != null)
+                            {
+                                InGameRecharge.instance.ClosePanel();
+                            }
+
+                        }
+                        GameManager.Instance.Recharged();
+
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Error handling recharge_success: {ex.Message}");
             }
         }
 
@@ -1236,7 +1378,7 @@ namespace Teenpatti
                             for (int i = 0; i < GameLiveData.instance.playerDetailsArray.Length; i++)
                             {
                                 if (GameLiveData.instance.playerDetailsArray[i] == null) continue;
-                                if (GameLiveData.instance.playerDetailsArray[i].userId == turnUpdate.currentTurn)
+                                if (GameLiveData.instance.playerDetailsArray[i].publicId == turnUpdate.currentTurnPublicId)
                                 {
                                     turnIndex = i;
                                     GameLiveData.instance.currentTurn = i;
@@ -1247,11 +1389,10 @@ namespace Teenpatti
 
                         GameLiveData.instance.currentRound = turnUpdate.round;
 
-
                         if (GameManager.Instance != null)
                         {
                             GameManager.Instance.UpdateRoundNumberTMP();
-                            GameManager.Instance.UpdateTurn(turnUpdate.currentTurn, turnUpdate.canShow, turnUpdate.canSideShow);
+                            GameManager.Instance.UpdateTurn(turnUpdate.currentTurnPublicId, turnUpdate.canShow, turnUpdate.canSideShow);
 
                         }
                     });
@@ -1292,13 +1433,28 @@ namespace Teenpatti
                 {
                     MainThreadDispatcher.Enqueue(() =>
                     {
-
                         if (GameManager.Instance != null)
                         {
                             GameLiveData.instance.currentPot = actionUpdate.pot;
                             GameLiveData.instance.lastBetAmount = actionUpdate.lastBetAmount;
                             GameLiveData.instance.lastPlayerSeen = actionUpdate.lastPlayerSeen;
-                            GameManager.Instance.PlayerAction(actionUpdate.userID, actionUpdate.action, actionUpdate.amount);
+
+                            try
+                            {
+                                string localId = BootstrapLobbyAdapter.GetUserId();
+                                if (!string.IsNullOrEmpty(localId) && actionUpdate.publicId == localId && BootstrapService.Instance != null && BootstrapService.Instance.Wallet != null)
+                                {
+                                    long deduction = (long)(actionUpdate.amount * 100);
+                                    if (deduction > 0)
+                                    {
+                                        // BootstrapService.Instance.Wallet.available_balance -= deduction;
+                                        // BootstrapService.Instance.Wallet.withdrawable_amount -= deduction;
+                                    }
+                                }
+                            }
+                            catch { }
+                            GameManager.Instance.PlayerAction(actionUpdate.publicId, actionUpdate.action, actionUpdate.amount);
+
                         }
                     });
                 }
@@ -1338,8 +1494,8 @@ namespace Teenpatti
                 {
                     MainThreadDispatcher.Enqueue(() =>
                     {
-
-                        GiftSystem.instance.OnGiftReceived(actionUpdate.from, actionUpdate.to, actionUpdate.gift);
+                        Debug.Log($"Gift received from: {actionUpdate.fromPublicId}, to: {actionUpdate.to}, gift: {actionUpdate.gift}");
+                        GiftSystem.instance.OnGiftReceived(actionUpdate.fromPublicId, actionUpdate.to, actionUpdate.gift);
                     });
                 }
             }
@@ -1415,22 +1571,31 @@ namespace Teenpatti
                         {
 
                             SideShowHandler.Instance.ShowSideShowRequest(
-                                sideShowRequest.requesterID,
-                                sideShowRequest.targetID,
+                                sideShowRequest.requesterPublicId,
+                                sideShowRequest.targetPublicId,
                                 sideShowRequest.timeout
                             );
 
                             foreach (PlayerManager player in GameManager.Instance.playersList)
                             {
-                                if (player.myId == sideShowRequest.requesterID)
+                                if (player.myId == sideShowRequest.requesterPublicId)
                                 {
                                     player.ShowMsg("SideShow");
                                     break;
                                 }
                             }
+
+                            foreach (PlayerManager player in GameManager.Instance.playersList)
+                            {
+                                if (player.myId == sideShowRequest.requesterPublicId && player.myId == GameManager.Instance.localPlayer.myId)
+                                {
+                                    player.StopTimer();
+                                    break;
+                                }
+                            }
                         }
 
-                        Debug.Log($"Side show requested by: {sideShowRequest.requesterID}, timeout: {sideShowRequest.timeout}s");
+                        Debug.Log($"Side show requested by: {sideShowRequest.requesterPublicId}, timeout: {sideShowRequest.timeout}s");
                     });
                 }
             }
@@ -1478,9 +1643,12 @@ namespace Teenpatti
                         // Update UI based on result
                         if (sideShowResult.winnerFound)
                         {
+                            Debug.Log($"Number of players: {GameManager.Instance.playersList.Count}");
                             foreach (PlayerManager player in GameManager.Instance.playersList)
                             {
-                                if (player.myId == sideShowResult.requester)
+                                if (player == null) continue;
+                                Debug.Log($"Player: {player.myId}, Requester: {sideShowResult.requesterPublicId}, Responder: {sideShowResult.responderPublicId}");
+                                if (player.myId == sideShowResult.requesterPublicId)
                                 {
                                     player.AddMoneyToPool(sideShowResult.amount);
                                 }
@@ -1488,7 +1656,12 @@ namespace Teenpatti
                                 {
                                     ActionButtons.instance.OnCheckCards();
                                 }
-                                if (player.myId == sideShowResult.responder)
+                            }
+
+                            foreach (PlayerManager player in GameManager.Instance.playersList)
+                            {
+                                if (player == null) continue;
+                                if (player.myId == sideShowResult.responderPublicId)
                                 {
                                     player.ShowMsg("Accepted");
                                     break;
@@ -1500,7 +1673,7 @@ namespace Teenpatti
                             {
                                 foreach (var player in GameLiveData.instance.playerDetailsArray)
                                 {
-                                    if (player.userId == sideShowResult.loser)
+                                    if (player.publicId == sideShowResult.loserPublicId)
                                     {
                                         player.hasFolded = true;
 
@@ -1518,7 +1691,7 @@ namespace Teenpatti
                         {
                             foreach (PlayerManager player in GameManager.Instance.playersList)
                             {
-                                if (player.myId == sideShowResult.responder)
+                                if (player.myId == sideShowResult.responderPublicId)
                                 {
                                     player.DeclinedSideShow();
                                 }
@@ -1542,16 +1715,16 @@ namespace Teenpatti
                 if (sideShowResult.winnerFound)
                 {
                     var from = GameManager.Instance.playersList
-                        .Find(p => p.myId == sideShowResult.winner);
+                        .Find(p => p.myId == sideShowResult.winnerPublicId);
 
                     var to = GameManager.Instance.playersList
-                        .Find(p => p.myId == sideShowResult.loser);
+                        .Find(p => p.myId == sideShowResult.loserPublicId);
 
                     ThunderUIManager.Instance.PlayThunder(from, to);
                 }
 
 
-                if (playerManager.myId == sideShowResult.loser)
+                if (playerManager.myId == sideShowResult.loserPublicId)
                 {
                     playerManager.Lose();
                     break;
@@ -1605,8 +1778,8 @@ namespace Teenpatti
             GameManager.Instance.ShowdownDe(showdown.requester, showdown.amount, showdown.type);
             yield return new WaitForSeconds(1.5f);
 
-            var winnerPM = GameManager.Instance.playersList.Find(p => p.myId == showdown.winner);
-            var loserPM = GameManager.Instance.playersList.Find(p => p.myId == showdown.loser);
+            var winnerPM = GameManager.Instance.playersList.Find(p => p.myId == showdown.winnerPublicId);
+            var loserPM = GameManager.Instance.playersList.Find(p => p.myId == showdown.loserPublicId);
 
             var requesterPM = GameManager.Instance.playersList.Find(p => p.myId == showdown.requester);
 
@@ -1615,7 +1788,7 @@ namespace Teenpatti
                 ThunderUIManager.Instance.PlayThunder(winnerPM, loserPM);
                 yield return new WaitForSeconds(1.5f);
             }
-            GameManager.Instance.Showdown(showdown.players[0].userID, showdown.players[1].userID, showdown.players[0].handRank.Cards, showdown.players[1].handRank.Cards, showdown.players[0].handRank.Name, showdown.players[1].handRank.Name);
+            GameManager.Instance.Showdown(showdown.players[0].publicId, showdown.players[1].publicId, showdown.players[0].handRank.Cards, showdown.players[1].handRank.Cards, showdown.players[0].handRank.Name, showdown.players[1].handRank.Name);
 
             yield return new WaitForSeconds(2f);
 
@@ -1624,7 +1797,7 @@ namespace Teenpatti
             foreach (var sdPlayer in showdown.players)
             {
                 var playerManager = GameManager.Instance.playersList
-                    .Find(p => p.myId == sdPlayer.userID);
+                    .Find(p => p.myId == sdPlayer.publicId);
 
                 if (playerManager == null) continue;
 
@@ -1637,7 +1810,7 @@ namespace Teenpatti
                 }
 
                 playerManager.ShowCards(cardSprites);
-                if (sdPlayer.userID == GameManager.Instance.localPlayer.myId && ActionButtons.instance != null)
+                if (sdPlayer.publicId == GameManager.Instance.localPlayer.myId && ActionButtons.instance != null)
                     ActionButtons.instance.checkBtn.SetActive(false);
 
 
@@ -1645,7 +1818,7 @@ namespace Teenpatti
                 playerManager.ShowHandRank(sdPlayer.handRank.Name);
 
                 // 🏆 Winner vs Loser
-                if (sdPlayer.userID == showdown.winner)
+                if (sdPlayer.publicId == showdown.winnerPublicId)
                 {
                     //playerManager.Win();
                 }
@@ -1653,7 +1826,7 @@ namespace Teenpatti
                 {
 
                     playerManager.Lose(); // ❗ LOSER PACK
-                    if (sdPlayer.userID == GameManager.Instance.localPlayer.myId)
+                    if (sdPlayer.publicId == GameManager.Instance.localPlayer.myId)
                     {
                         playerManager.myAudioSouce.PlayOneShot(GameManager.Instance.playerLoseAC);
                     }
@@ -1707,7 +1880,7 @@ namespace Teenpatti
                             CardObject[] cards = null;
                             if (gameEndData.result == "winner" && gameEndData.winner != null)
                             {
-                                winnerId = gameEndData.winner.userID;
+                                winnerId = gameEndData.winner.publicId;
                                 cards = gameEndData.cards;
                             }
 
@@ -1726,10 +1899,18 @@ namespace Teenpatti
 
 
                                 // Update chips if local player won
-                                if (gameEndData.winner != null && gameEndData.winner.userID == BootstrapLobbyAdapter.GetUserId())
+                                if (gameEndData.winner != null && gameEndData.winner.publicId == BootstrapLobbyAdapter.GetUserId())
                                 {
-                                    Wallet.AddToWinWallet(gameEndData.prize);
                                     GameData.Instance.UpdateChips(gameEndData.pot);
+                                    try
+                                    {
+                                        if (BootstrapService.Instance != null && BootstrapService.Instance.Wallet != null)
+                                        {
+                                            BootstrapService.Instance.Wallet.available_balance += gameEndData.prizePaisa;
+                                            BootstrapService.Instance.Wallet.withdrawable_amount += gameEndData.prizePaisa;
+                                        }
+                                    }
+                                    catch { }
                                     GameManager.Instance.UpdateWalletTxt();
                                 }
                             }
@@ -1827,9 +2008,10 @@ namespace Teenpatti
                 {
                     MainThreadDispatcher.Enqueue(() =>
                     {
-                        // Debug.Log("Unregistering player: " + playerDisconnectedData.userID);
-                        GameManager.Instance.UnregisterPlayer(playerDisconnectedData.userID);
+                        // Debug.Log("Unregistering player: " + playerDisconnectedData.publicId);
+                        // GameManager.Instance.UnregisterPlayer(playerDisconnectedData.publicId);
                         Loader.Instance.HideLoading();
+                        Debug.Log("Player disconnected: " + playerDisconnectedData.publicId);
                     });
                 }
             }
@@ -1913,8 +2095,17 @@ namespace Teenpatti
                     {
                         // Return to lobby
                         //SceneManager.LoadScene("Lobby");
-                        GameLiveData.instance.ResetGameData();
-                        GameManager.Instance.OnLobby();
+                        if (leftData.publicId == GameManager.Instance.localPlayer.myId)
+                        {
+                            Debug.Log("Local player left the game. Returning to lobby.");
+                            GameLiveData.instance.ResetGameData();
+                            GameManager.Instance.OnLobby();
+                        }
+                        else
+                        {
+                            Debug.Log($"Player {leftData.publicId} left the game.");
+                            GameManager.Instance.UnregisterPlayer(leftData.publicId);
+                        }
                     });
                 }
             }
@@ -2029,8 +2220,8 @@ namespace Teenpatti
                     var playerState = gameState.players[i];
                     playerDetails[i] = new PlayerDetails
                     {
-                        id = playerState.userID,
-                        userId = playerState.userID,
+                        id = playerState.publicId,
+                        publicId = playerState.publicId,
                         username = playerState.username,
                         chips = playerState.chips,
                         amount = playerState.chips,
@@ -2041,10 +2232,10 @@ namespace Teenpatti
                         betAmount = playerState.betAmount,
                         totalBetAmount = playerState.totalBet,
                         action = playerState.lastAction,
-                        isMyTurn = playerState.userID == gameState.currentTurn,
+                        isMyTurn = playerState.publicId == gameState.currentTurn,
                         isBot = playerState.isBot,
-                        profileImageIndex = UnityEngine.Random.Range(0, 5),
-                        cards = gameState.yourCards != null && playerState.userID == GameData.Instance.userId
+                        profileImageUrl = "",
+                        cards = gameState.yourCards != null && playerState.publicId == GameData.Instance.userId
                             ? Array.ConvertAll(gameState.yourCards, card => card.code)
                             : null
                     };
@@ -2061,7 +2252,7 @@ namespace Teenpatti
                 // Find current turn index
                 for (int i = 0; i < playerDetails.Length; i++)
                 {
-                    if (playerDetails[i].userId == gameState.currentTurn)
+                    if (playerDetails[i].publicId == gameState.currentTurn)
                     {
                         GameLiveData.instance.currentTurn = i;
                         break;
@@ -2116,7 +2307,7 @@ namespace Teenpatti
             public string tableID;
             public int bootAmount; // waiting or playing
             public int dealerPosition;
-            public int state;
+            public string state;
             public int pot;
             public int lastBetAmount;
             public bool lastPlayerSeen;
@@ -2126,7 +2317,7 @@ namespace Teenpatti
             public bool yourTurn;
             public float turnTimeRemaining;
             public string rechargingPlayer;
-            public float rechargeTimeRemaining;
+            public int rechargeTimeRemaining;
 
         }
 
@@ -2173,6 +2364,7 @@ namespace Teenpatti
             public int pot;
             public PlayerStateOnGS[] players;
             public string currentTurn;
+            public string currentTurnPublicId;
             public int commision;
         }
 
@@ -2202,7 +2394,7 @@ namespace Teenpatti
         [System.Serializable]
         public class PlayerState
         {
-            public string userID;
+            public string publicId;
             public string username;
             public int chips;
             public CardObject[] cards;
@@ -2221,22 +2413,23 @@ namespace Teenpatti
         [System.Serializable]
         public class PlayerStateOnGS
         {
-            public string UserID;
-            public string Username;
-            public int Chips;
-            public int Position;
-            public bool IsActive;
-            public bool HasFolded;
-            public bool IsBot;
-            public bool IsBlind;
-            public bool IsSeen;
-            public int BetAmount;
-            public int TotalBet;
-            public string LastAction;
+            // public string userID;
+            public string publicId;
+            public string username;
+            public int chips;
+            public int position;
+            public bool isActive;
+            public bool hasFolded;
+            public bool isBot;
+            public bool isBlind;
+            public bool isSeen;
+            public int betAmount;
+            public int totalBet;
+            public string lastAction;
             public bool canSideShow;
             public bool canShow;
 
-            public ProfileImage ProfileImage;
+            public string profileImageUrl;
 
 
         }
@@ -2249,14 +2442,14 @@ namespace Teenpatti
             public string userID;
             public string username;
             public int position;
-            public ProfileImage profileImage;
+            public String profileImageUrl;
 
         }
 
         [System.Serializable]
         public class PlayerStateOnRejoin
         {
-            public string userID;
+            public string publicId;
             public string username;
             public int chips;
             public int position;
@@ -2273,7 +2466,7 @@ namespace Teenpatti
             public string[] cards;
             public string cardsType;
 
-            public ProfileImage profileImage;
+            public string profileImageUrl;
 
 
         }
@@ -2287,9 +2480,10 @@ namespace Teenpatti
             public bool isBlind;
             public bool isSeen;
             public int position;
-            public string userID;
+            public string publicId;
             public string username;
             public int betAmount;
+            public string profileImageUrl;
         }
 
 
@@ -2306,7 +2500,7 @@ namespace Teenpatti
         [Serializable]
         public class ShowDownPlayer
         {
-            public string userID;
+            public string publicId;
             public HandRank handRank;
         }
 
@@ -2314,8 +2508,9 @@ namespace Teenpatti
         [Serializable]
         public class GiftUpdateResponse
         {
-            public string from;
+            public string fromPublicId;
             public string to;
+            public string toPublicId;
             public int gift;
         }
 
@@ -2323,6 +2518,7 @@ namespace Teenpatti
         public class ActionUpdateResponse
         {
             public string userID;
+            public string publicId;
             public string action;
             public int amount;
             public int pot;
@@ -2334,6 +2530,7 @@ namespace Teenpatti
         public class TurnUpdateResponse
         {
             public string currentTurn;
+            public string currentTurnPublicId;
             public int position;
             public int round;
             public int timeRemaining;
@@ -2343,17 +2540,27 @@ namespace Teenpatti
         [System.Serializable]
         public class PlayerRechargingResponse
         {
-            public string userID;
-            public int timeout;
+            public string publicId;
+            public string username;
+            public float timeout;
         }
-        [System.Serializable]
 
+        [System.Serializable]
         public class PlayerRechargedResponse
         {
             public string userID;
         }
 
         [System.Serializable]
+        public class RechargeSuccessResponse
+        {
+            public string userID;
+            public string publicId;
+            public int amount;
+            public int chips;
+        }
+
+        [Serializable]
         public class BetUpdateData
         {
             public int lastBetAmount;
@@ -2372,8 +2579,10 @@ namespace Teenpatti
         [System.Serializable]
         public class SideShowRequestData
         {
-            public string requesterID;
-            public string targetID;
+            // public string requesterID;
+            public string requesterPublicId;
+            // public string targetID;
+            public string targetPublicId;
             public int timeout;
         }
 
@@ -2381,10 +2590,10 @@ namespace Teenpatti
         public class SideShowResultData
         {
             public bool winnerFound;
-            public string responder;
-            public string requester;
-            public string winner;
-            public string loser;
+            public string responderPublicId;
+            public string requesterPublicId;
+            public string winnerPublicId;
+            public string loserPublicId;
             public int amount;
         }
 
@@ -2394,7 +2603,7 @@ namespace Teenpatti
         {
             public string tableID;
             public int pot;
-            public float prize;
+            public long prizePaisa;
             public string result; // winner or tie
             public PlayerState winner;
             public CardObject[] cards;
@@ -2411,9 +2620,9 @@ namespace Teenpatti
             public string tableID;
             public int pot;
             public ShowDownPlayer[] players;
-            public string winner;
-            public string loser;
+            public string loserPublicId;
             public string requester;
+            public string winnerPublicId;
             public string type;
             public float amount;
         }
@@ -2429,7 +2638,7 @@ namespace Teenpatti
         [System.Serializable]
         public class LeftResponse
         {
-            public bool success;
+            public string publicId;
         }
 
         [System.Serializable]
@@ -2441,7 +2650,7 @@ namespace Teenpatti
         [System.Serializable]
         public class PlayerDisconnectedResponse
         {
-            public string userID;
+            public string publicId;
         }
 
         [System.Serializable]
@@ -2492,8 +2701,7 @@ namespace Teenpatti
             public string userID;
             public string username;
             public int position;
-            public ProfileImage profile_image;
-
+            public string profileImageUrl;
         }
 
         [System.Serializable]
@@ -2516,15 +2724,9 @@ namespace Teenpatti
     }
 
     [System.Serializable]
-    public class ProfileImage
-    {
-        public int index;
-        public string url;
-    }
-    [System.Serializable]
     public class PackedPlayerData
     {
-        public string userID;
+        public string publicId;
         public string[] cards;
         public string handType;
     }
